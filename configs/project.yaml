@@ -1,0 +1,12 @@
+name: youtube-trend-tracker
+language: go
+modules:
+  - fetcher        # YouTube Data API を呼び出す Cloud Run サービス
+  - scheduler      # fetcher をトリガーする Cloud Scheduler（Cron）
+  - storage        # BigQuery のデータセット & テーブル定義
+  - analytics      # 成長率計算用 BigQuery ビュー
+  - dashboard      # Looker Studio 用データソースの初期化
+secrets:
+  - YOUTUBE_API_KEY   # Data API v3 用の API キー
+  - PROJECT_ID        # GCP プロジェクト ID（デプロイ時に注入）
+  - REGION            # Cloud Run を配置する GCP リージョン

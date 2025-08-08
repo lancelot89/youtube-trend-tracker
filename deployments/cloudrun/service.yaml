@@ -1,0 +1,20 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: fetcher
+spec:
+  template:
+    spec:
+      containers:
+      - image: gcr.io/PROJECT_ID/fetcher
+        env:
+        - name: YOUTUBE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: youtube-api-key
+              key: latest
+        - name: CHANNEL_CONFIG
+          valueFrom:
+            configMapKeyRef:
+              name: channel-config
+              key: channels.yaml

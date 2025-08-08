@@ -1,0 +1,11 @@
+version: "3.8"
+services:
+  bq-emulator:
+    image: ghcr.io/goccy/bigquery-emulator:0.4.2
+    platform: linux/amd64
+    command: --project=test-project
+    volumes:
+      - ./deployments/bq:/testdata
+    ports:
+      - "9050:9050" # HTTP
+      - "9060:9060" # gRPC

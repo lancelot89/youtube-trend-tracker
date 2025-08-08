@@ -1,0 +1,9 @@
+{
+    "name": "projects/PROJECT_ID/locations/REGION/jobs/fetch-youtube-stats",
+    "schedule": "0 */6 * * *",
+    "timeZone": "UTC",
+    "httpTarget": {
+        "uri": "https://fetcher-*.a.run.app",
+        "httpMethod": "POST"
+    }
+}
