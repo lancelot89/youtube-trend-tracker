@@ -26,15 +26,16 @@ gcloud iam service-accounts describe "$SCHEDULER_SA" --project="$PROJECT_ID" >/d
         --display-name="Cloud Scheduler Invoker SA" \
         --project="$PROJECT_ID"
 
-# Grant invoker role to the scheduler service account
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+# Grant invoker role to the scheduler service account for the specific Cloud Run service
+gcloud run services add-iam-policy-binding "$SERVICE" \
+    --region="$REGION" \
     --member="serviceAccount:$SCHEDULER_SA" \
-    --role="roles/run.invoker" >/dev/null
+    --role="roles/run.invoker" \
+    --project="$PROJECT_ID" >/dev/null
 
+echo "Updating Cloud Scheduler job to trigger $SERVICE..."
 
-echo "Creating Cloud Scheduler job to trigger $SERVICE..."
-
-gcloud scheduler jobs create http trend-tracker-hourly \
+gcloud scheduler jobs update http trend-tracker-hourly \
   --schedule="0 * * * *" \
   --uri="$CRON_SVC_URL" \
   --http-method=POST \
@@ -42,5 +43,4 @@ gcloud scheduler jobs create http trend-tracker-hourly \
   --location="$REGION" \
   --project="$PROJECT_ID"
 
-echo "Cloud Scheduler job created."
-
+echo "Cloud Scheduler job updated."

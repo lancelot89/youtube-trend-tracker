@@ -42,30 +42,41 @@
 
 ## クイックスタート (TL;DR)
 
+最初にスクリプトへ実行権限を付与してください。
 ```bash
-# 変数を自分の環境に合わせて設定
-export PROJECT_ID="your-project-id"
-export REGION="us-central1"        # Cloud Run & Artifact Registry
-export SERVICE="youtube-trend-tracker"
-export AR_REPO="trend-tracker-repo"
-
-# 1) API 有効化
-bash scripts/enable-apis.sh  "$PROJECT_ID"
-
-# 2) Artifact Registry 作成
-bash scripts/setup-artifact-registry.sh "$PROJECT_ID" "$REGION" "$AR_REPO"
-
-# 3) コンテナをビルドして push
-bash scripts/build-and-push.sh "$PROJECT_ID" "$REGION" "$AR_REPO"
-
-# 4) Cloud Run へデプロイ
-bash scripts/deploy-cloud-run.sh "$PROJECT_ID" "$REGION" "$SERVICE" "$AR_REPO"
-
-# 5) 1 時間ごとに実行する Cloud Scheduler を作成
-bash scripts/create-scheduler.sh "$PROJECT_ID" "$REGION" "$SERVICE"
+chmod +x scripts/*.sh
 ```
 
-> **備考**: 上記スクリプトは `scripts/` ディレクトリにサンプルとして格納しています。環境変数・IAM・Secret Manager の参照はプロジェクト構成に応じて修正してください。
+次に、ご自身の環境に合わせて変数を設定し、以下のコマンドを順番に実行します。
+
+```bash
+# 1. 環境変数の設定
+export PROJECT_ID="your-gcp-project-id"
+export REGION="asia-northeast1"          # 例: us-central1, asia-northeast1
+export AR_REPO="youtube-trend-repo"      # Artifact Registry のリポジトリ名
+export SERVICE_NAME="youtube-trend-tracker" # Cloud Run のサービス名
+
+# 2. デプロイスクリプトの実行
+echo "Step 1/5: Google Cloud API の有効化..."
+./scripts/enable-apis.sh "${PROJECT_ID}"
+
+echo -e "\nStep 2/5: Artifact Registry リポジトリのセットアップ..."
+./scripts/setup-artifact-registry.sh "${PROJECT_ID}" "${REGION}" "${AR_REPO}"
+
+echo -e "\nStep 3/5: コンテナイメージのビルドとプッシュ..."
+./scripts/build-and-push.sh "${PROJECT_ID}" "${REGION}" "${AR_REPO}" "${SERVICE_NAME}"
+
+echo -e "\nStep 4/5: Cloud Run サービスのデプロイ..."
+./scripts/deploy-cloud-run.sh "${PROJECT_ID}" "${REGION}" "${SERVICE_NAME}" "${AR_REPO}"
+
+echo -e "\nStep 5/5: Cloud Scheduler ジョブの作成・更新..."
+./scripts/create-scheduler.sh "${PROJECT_ID}" "${REGION}" "${SERVICE_NAME}"
+
+echo -e "\n\n✅ 全てのデプロイプロセスが完了しました。"
+```
+
+> **備考**: 各スクリプトは冪等性を持つように作られていますが、IAMやSecretなど、環境に依存する値がハードコードされている場合があります。必要に応じて `scripts/` ディレクトリ内のスクリプトを直接編集してください。
+
 
 ---
 
@@ -122,25 +133,30 @@ docker push "$REGION"-docker.pkg.dev/"$PROJECT_ID"/"$AR_REPO"/tracker:latest
 ### 5. Cloud Run デプロイ
 
 ```bash
-gcloud run deploy "$SERVICE" \
-  --image="$REGION"-docker.pkg.dev/"$PROJECT_ID"/"$AR_REPO"/tracker:latest \
-  --service-account="trend-tracker-sa@$PROJECT_ID.iam.gserviceaccount.com" \
+# 変数名はクイックスタートの例を参照
+gcloud run deploy "$SERVICE_NAME" \
+  --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_NAME}:latest" \
+  --service-account="trend-tracker-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
   --set-secrets="YOUTUBE_API_KEY=youtube-api-key:latest" \
-  --region="$REGION" --platform=managed --allow-unauthenticated
+  --region="$REGION" \
+  --platform=managed \
+  --no-allow-unauthenticated
 ```
 
 ### 6. Cloud Scheduler の作成
 
 ```bash
-CRON_SVC_URL=$(gcloud run services describe "$SERVICE" --region="$REGION" --format="value(status.url)")
+# 変数名はクイックスタートの例を参照
+CRON_SVC_URL=$(gcloud run services describe "$SERVICE_NAME" --region="$REGION" --format="value(status.url)")
 
-gcloud scheduler jobs create http trend-tracker-hourly \
+# 冪等性のため create の代わりに update を使用
+gcloud scheduler jobs update http trend-tracker-hourly \
   --schedule="0 * * * *" \
   --uri="$CRON_SVC_URL" \
   --http-method=POST \
-  --oauth-service-account="scheduler-sa@$PROJECT_ID.iam.gserviceaccount.com" \
-  --headers="Content-Type=application/json"
+  --oauth-service-account-email="scheduler-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 ```
+
 
 ---
 

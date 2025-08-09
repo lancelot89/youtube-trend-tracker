@@ -37,7 +37,7 @@ gcloud run deploy "$SERVICE" \
     --set-secrets="YOUTUBE_API_KEY=youtube-api-key:latest" \
     --region="$REGION" \
     --platform=managed \
-    --allow-unauthenticated
+    --no-allow-unauthenticated
 
 echo "Cloud Run deployment complete."
 

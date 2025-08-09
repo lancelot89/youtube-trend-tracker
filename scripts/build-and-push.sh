@@ -19,7 +19,7 @@ echo "Building and pushing container image: $IMAGE_URI..."
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --project="$PROJECT_ID"
 
 # Build and push the container
-docker build -t "$IMAGE_URI" .
+docker build --platform linux/amd64 -t "$IMAGE_URI" .
 docker push "$IMAGE_URI"
 
 echo "Build and push complete."
