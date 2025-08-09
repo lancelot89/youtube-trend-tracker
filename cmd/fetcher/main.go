@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/user/youtube-trend-tracker/internal/fetcher"
-	"github.com/user/youtube-trend-tracker/internal/storage"
-	"github.com/user/youtube-trend-tracker/internal/youtube"
+	"github.com/lancelop89/youtube-trend-tracker/internal/fetcher"
+	"github.com/lancelop89/youtube-trend-tracker/internal/storage"
+	"github.com/lancelop89/youtube-trend-tracker/internal/youtube"
 	"gopkg.in/yaml.v2"
 )
 
@@ -71,7 +71,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
 	// --- Configuration ---
-	projectID := os.Getenv("PROJECT_ID")
+	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	apiKey := os.Getenv("YOUTUBE_API_KEY")
 	channelConfigPath := os.Getenv("CHANNEL_CONFIG_PATH")
 

@@ -1,6 +1,6 @@
-module github.com/user/youtube-trend-tracker
+module github.com/lancelop89/youtube-trend-tracker
 
-go 1.24.3
+go 1.24.6
 
 require (
 	cloud.google.com/go/bigquery v1.69.0

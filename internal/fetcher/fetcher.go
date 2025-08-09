@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/user/youtube-trend-tracker/internal/storage"
-	"github.com/user/youtube-trend-tracker/internal/youtube"
+	"github.com/lancelop89/youtube-trend-tracker/internal/storage"
+	"github.com/lancelop89/youtube-trend-tracker/internal/youtube"
 )
 
 // Fetcher orchestrates the data fetching and storing process.
