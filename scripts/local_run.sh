@@ -11,7 +11,7 @@ export GCP_PROJECT="test-project"
 export BIGQUERY_EMULATOR_HOST="host.docker.internal:9060"
 BIGQUERY_EMULATOR_API_HOST="http://host.docker.internal:9050"
 export PORT=8080
-export YOUTUBE_API_KEY="your-api-key"
+
 DATASET_NAME="youtube"
 TABLE_NAME="video_trends"
 SCHEMA_FILE="$PROJECT_ROOT/deployments/bq/schema.json"

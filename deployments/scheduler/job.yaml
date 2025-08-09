@@ -4,6 +4,10 @@
     "timeZone": "UTC",
     "httpTarget": {
         "uri": "https://fetcher-*.a.run.app",
-        "httpMethod": "POST"
+        "httpMethod": "POST",
+        "oidcToken": {
+            "serviceAccountEmail": "scheduler-sa@PROJECT_ID.iam.gserviceaccount.com",
+            "audience": "https://fetcher-*.a.run.app"
+        }
     }
 }

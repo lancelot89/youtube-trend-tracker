@@ -5,16 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
-	"google.golang.org/api/youtube/v3"
+	yt "google.golang.org/api/youtube/v3"
 )
 
-// Client provides a wrapper around the YouTube Data API.
 type Client struct {
-	service *youtube.Service
+	service *yt.Service
 }
 
-// Video represents a simplified YouTube video resource.
 type Video struct {
 	ID          string
 	Title       string
@@ -24,63 +23,101 @@ type Video struct {
 	PublishedAt time.Time
 }
 
-// NewClient creates a new YouTube API client.
 func NewClient(ctx context.Context, apiKey string) (*Client, error) {
-	service, err := youtube.NewService(ctx, option.WithAPIKey(apiKey))
+	svc, err := yt.NewService(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		return nil, fmt.Errorf("youtube.NewService: %w", err)
 	}
-	return &Client{service: service}, nil
+	return &Client{service: svc}, nil
 }
 
-// FetchChannelVideos fetches the most recent videos for a given channel ID.
+// FetchChannelVideos returns latest N videos with snippet/statistics.
 func (c *Client) FetchChannelVideos(ctx context.Context, channelID string, maxResults int64) ([]*Video, error) {
-	// 1. Find the playlist ID for the channel's uploads.
-	channelCall := c.service.Channels.List([]string{"contentDetails"}).Id(channelID)
-	channelResponse, err := channelCall.Do()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get channel details: %w", err)
+	ch, err := c.service.Channels.List([]string{"contentDetails"}).Id(channelID).Do()
+	if err != nil || len(ch.Items) == 0 {
+		return nil, fmt.Errorf("channels.list: %w", err)
 	}
-	if len(channelResponse.Items) == 0 {
-		return nil, fmt.Errorf("channel not found: %s", channelID)
-	}
-	uploadsPlaylistID := channelResponse.Items[0].ContentDetails.RelatedPlaylists.Uploads
+	uploads := ch.Items[0].ContentDetails.RelatedPlaylists.Uploads
 
-	// 2. Fetch the latest videos from the uploads playlist.
-	playlistCall := c.service.PlaylistItems.List([]string{"snippet"}).
-		PlaylistId(uploadsPlaylistID).
-		MaxResults(maxResults)
+	var allVideoIDs []string
+	nextPageToken := ""
 
-	playlistResponse, err := playlistCall.Do()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get playlist items: %w", err)
-	}
-
-	var videoIDs []string
-	for _, item := range playlistResponse.Items {
-		videoIDs = append(videoIDs, item.Snippet.ResourceId.VideoId)
-	}
-
-	// 3. Fetch detailed statistics for each video.
-	videoCall := c.service.Videos.List([]string{"snippet", "statistics"}).Id(videoIDs...)
-	videoResponse, err := videoCall.Do()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get video details: %w", err)
-	}
-
-	var videos []*Video
-	for _, item := range videoResponse.Items {
-		publishedAt, _ := time.Parse(time.RFC3339, item.Snippet.PublishedAt)
-		video := &Video{
-			ID:          item.Id,
-			Title:       item.Snippet.Title,
-			Views:       item.Statistics.ViewCount,
-			Likes:       item.Statistics.LikeCount,
-			Comments:    item.Statistics.CommentCount,
-			PublishedAt: publishedAt,
+	for {
+		itCall := c.service.PlaylistItems.List([]string{"contentDetails"}).PlaylistId(uploads).MaxResults(maxResults)
+		if nextPageToken != "" {
+			itCall = itCall.PageToken(nextPageToken)
 		}
-		videos = append(videos, video)
+		var itResp *yt.PlaylistItemListResponse
+		var err error
+		for i := 0; i < 5; i++ { // Max 5 retries
+			itResp, err = itCall.Do()
+			if err == nil {
+				break
+			}
+			// Check if it's a retriable error (e.g., 429 Too Many Requests, 5xx Server Error)
+			if e, ok := err.(*googleapi.Error); ok && (e.Code == 429 || (e.Code >= 500 && e.Code < 600)) {
+				sleepTime := time.Duration(1<<uint(i)) * time.Second // Exponential backoff
+				time.Sleep(sleepTime)
+				continue
+			}
+			return nil, fmt.Errorf("playlistItems.list: %w", err) // Non-retriable error
+		}
+		if err != nil {
+			return nil, fmt.Errorf("playlistItems.list: %w", err) // All retries failed
+		}
+
+		for _, it := range itResp.Items {
+			allVideoIDs = append(allVideoIDs, it.ContentDetails.VideoId)
+		}
+
+		nextPageToken = itResp.NextPageToken
+		if nextPageToken == "" || int64(len(allVideoIDs)) >= maxResults {
+			break
+		}
 	}
 
-	return videos, nil
+	if len(allVideoIDs) == 0 {
+		return nil, nil
+	}
+
+	// Fetch video details in batches of 50 (YouTube API limit)
+	var allVideos []*Video
+	for i := 0; i < len(allVideoIDs); i += 50 {
+		end := i + 50
+		if end > len(allVideoIDs) {
+			end = len(allVideoIDs)
+		}
+		batchIDs := allVideoIDs[i:end]
+
+		var vResp *yt.VideoListResponse
+		var err error
+		for i := 0; i < 5; i++ { // Max 5 retries
+			vResp, err = c.service.Videos.List([]string{"snippet", "statistics"}).Id(batchIDs...).Do()
+			if err == nil {
+				break
+			}
+			// Check if it's a retriable error
+			if e, ok := err.(*googleapi.Error); ok && (e.Code == 429 || (e.Code >= 500 && e.Code < 600)) {
+				sleepTime := time.Duration(1<<uint(i)) * time.Second // Exponential backoff
+				time.Sleep(sleepTime)
+				continue
+			}
+			return nil, fmt.Errorf("videos.list: %w", err) // Non-retriable error
+		}
+		if err != nil {
+			return nil, fmt.Errorf("videos.list: %w", err) // All retries failed
+		}
+
+		for _, item := range vResp.Items {
+			var views, likes, comments uint64
+			if item.Statistics != nil {
+				views = item.Statistics.ViewCount
+				likes = item.Statistics.LikeCount
+				comments = item.Statistics.CommentCount
+			}
+			pub, _ := time.Parse(time.RFC3339, item.Snippet.PublishedAt)
+			allVideos = append(allVideos, &Video{ID: item.Id, Title: item.Snippet.Title, Views: views, Likes: likes, Comments: comments, PublishedAt: pub})
+		}
+	}
+	return allVideos, nil
 }

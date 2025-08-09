@@ -44,9 +44,9 @@ func (f *Fetcher) FetchAndStore(ctx context.Context, channelIDs []string) error 
 				ChannelID:   channelID, // Use the channelID from the loop
 				VideoID:     video.ID,
 				Title:       video.Title,
-				Views:       video.Views,
-				Likes:       video.Likes,
-				Comments:    video.Comments,
+				Views:       int64(video.Views),
+				Likes:       int64(video.Likes),
+				Comments:    int64(video.Comments),
 				PublishedAt: video.PublishedAt,
 			})
 		}

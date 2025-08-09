@@ -4,6 +4,7 @@ go 1.24.3
 
 require (
 	cloud.google.com/go/bigquery v1.69.0
+	github.com/joho/godotenv v1.5.1
 	google.golang.org/api v0.246.0
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -24,7 +25,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/pierrec/lz4/v4 v4.1.18 // indirect

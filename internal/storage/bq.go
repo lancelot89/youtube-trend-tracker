@@ -28,9 +28,9 @@ type VideoStatsRecord struct {
 	ChannelID   string    `bigquery:"channel_id"`
 	VideoID     string    `bigquery:"video_id"`
 	Title       string    `bigquery:"title"`
-	Views       uint64    `bigquery:"views"` // Changed from int64 to uint64
-	Likes       uint64    `bigquery:"likes"` // Changed from int64 to uint64
-	Comments    uint64    `bigquery:"comments"` // Changed from int64 to uint64
+	Views       int64    `bigquery:"views"` // Changed from uint64 to int64
+	Likes       int64    `bigquery:"likes"` // Changed from uint64 to int64
+	Comments    int64    `bigquery:"comments"` // Changed from uint64 to int64
 	PublishedAt time.Time `bigquery:"published_at"`
 }
 
@@ -88,7 +88,7 @@ func NewBigQueryWriter(ctx context.Context, projectID string) (*BigQueryWriter, 
 		// The BigQuery emulator requires a specific endpoint format.
 		// Note: The goccy/bigquery-emulator uses gRPC by default on port 9060.
 		// The endpoint needs to be set without the http/https scheme.
-		opts = append(opts, option.WithEndpoint(host))
+		opts = append(opts, option.WithEndpoint("http://"+host))
 		// For emulators, we often don't need actual authentication.
 		opts = append(opts, option.WithoutAuthentication())
 	}
@@ -102,9 +102,14 @@ func NewBigQueryWriter(ctx context.Context, projectID string) (*BigQueryWriter, 
 
 // InsertVideoStats inserts video statistics into the BigQuery table.
 func (w *BigQueryWriter) InsertVideoStats(ctx context.Context, records []*VideoStatsRecord) error {
+	if len(records) == 0 {
+		return nil // No records to insert
+	}
+
 	inserter := w.client.Dataset(DatasetID).Table(TableID).Inserter()
 	if err := inserter.Put(ctx, records); err != nil {
 		return fmt.Errorf("failed to insert records into BigQuery: %w", err)
 	}
+
 	return nil
 }

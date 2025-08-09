@@ -150,6 +150,10 @@ gcloud scheduler jobs create http trend-tracker-hourly \
 # .env.example をコピーして必要な環境変数を書き換え
 cp .env.example .env
 
+# BigQuery エミュレータを使用する場合 (任意)
+# docker run -p 9060:9060 -p 9061:9061 --name bigquery-emulator -d goccy/bigquery-emulator
+# .env ファイルに BIGQUERY_EMULATOR_HOST=localhost:9060 を設定
+
 # テスト実行
 go run ./cmd/fetcher/main.go --once --debug
 ```
