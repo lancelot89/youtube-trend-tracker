@@ -33,14 +33,26 @@ gcloud run services add-iam-policy-binding "$SERVICE" \
     --role="roles/run.invoker" \
     --project="$PROJECT_ID" >/dev/null
 
-echo "Updating Cloud Scheduler job to trigger $SERVICE..."
-
-gcloud scheduler jobs update http trend-tracker-hourly \
-  --schedule="0 * * * *" \
-  --uri="$CRON_SVC_URL" \
-  --http-method=POST \
-  --oauth-service-account-email="$SCHEDULER_SA" \
-  --location="$REGION" \
-  --project="$PROJECT_ID"
-
-echo "Cloud Scheduler job updated."
+# Check if the job already exists
+if gcloud scheduler jobs describe trend-tracker-hourly --location="$REGION" --project="$PROJECT_ID" >/dev/null 2>&1; then
+    echo "Updating existing Cloud Scheduler job 'trend-tracker-hourly' to trigger $SERVICE..."
+    gcloud scheduler jobs update http trend-tracker-hourly \
+        --schedule="0 * * * *" \
+        --uri="$CRON_SVC_URL" \
+        --http-method=POST \
+        --oidc-service-account-email="$SCHEDULER_SA" \
+        --location="$REGION" \
+        --project="$PROJECT_ID"
+    echo "Cloud Scheduler job updated."
+else
+    echo "Creating new Cloud Scheduler job 'trend-tracker-hourly' to trigger $SERVICE..."
+    gcloud scheduler jobs create http trend-tracker-hourly \
+        --schedule="0 * * * *" \
+        --uri="$CRON_SVC_URL" \
+        --http-method=POST \
+        --oidc-service-account-email="$SCHEDULER_SA" \
+        --location="$REGION" \
+        --project="$PROJECT_ID"
+    echo "Cloud Scheduler job created."
+fi
+"

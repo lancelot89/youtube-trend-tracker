@@ -55,25 +55,38 @@ export PROJECT_ID="your-gcp-project-id"
 export REGION="asia-northeast1"          # 例: us-central1, asia-northeast1
 export AR_REPO="youtube-trend-repo"      # Artifact Registry のリポジトリ名
 export SERVICE_NAME="youtube-trend-tracker" # Cloud Run のサービス名
+export YOUTUBE_API_KEY="your-youtube-api-key" # ご自身の API キーを設定してください
 
 # 2. デプロイスクリプトの実行
-echo "Step 1/5: Google Cloud API の有効化..."
+echo "Step 1/6: Google Cloud API の有効化..."
 ./scripts/enable-apis.sh "${PROJECT_ID}"
 
-echo -e "\nStep 2/5: Artifact Registry リポジトリのセットアップ..."
+echo -e "\nStep 2/6: Artifact Registry リポジトリのセットアップ..."
 ./scripts/setup-artifact-registry.sh "${PROJECT_ID}" "${REGION}" "${AR_REPO}"
 
-echo -e "\nStep 3/5: コンテナイメージのビルドとプッシュ..."
+echo -e "\nStep 3/6: YouTube APIキーを Secret Manager に登録..."
+./scripts/create-secret.sh
+
+echo -e "\nStep 4/6: コンテナイメージのビルドとプッシュ..."
 ./scripts/build-and-push.sh "${PROJECT_ID}" "${REGION}" "${AR_REPO}" "${SERVICE_NAME}"
 
-echo -e "\nStep 4/5: Cloud Run サービスのデプロイ..."
+echo -e "\nStep 5/6: Cloud Run サービスのデプロイ..."
 ./scripts/deploy-cloud-run.sh "${PROJECT_ID}" "${REGION}" "${SERVICE_NAME}" "${AR_REPO}"
 
-echo -e "\nStep 5/5: Cloud Scheduler ジョブの作成・更新..."
+echo -e "\nStep 6/6: Cloud Scheduler ジョブの作成・更新..."
 ./scripts/create-scheduler.sh "${PROJECT_ID}" "${REGION}" "${SERVICE_NAME}"
 
 echo -e "\n\n✅ 全てのデプロイプロセスが完了しました。"
 ```
+
+### 3. 2回目以降のデプロイ (コード変更時など)
+
+コンテナイメージの再ビルド、プッシュ、Cloud Run サービスの更新をまとめて実行します。
+
+```bash
+./scripts/redeploy.sh "${PROJECT_ID}" "${REGION}" "${AR_REPO}" "${SERVICE_NAME}"
+```}``````json
+{
 
 > **備考**: 各スクリプトは冪等性を持つように作られていますが、IAMやSecretなど、環境に依存する値がハードコードされている場合があります。必要に応じて `scripts/` ディレクトリ内のスクリプトを直接編集してください。
 
@@ -106,9 +119,21 @@ gcloud services enable \
 gcloud iam service-accounts create trend-tracker-sa \
   --display-name "YouTube Trend Tracker"
 
+# プロジェクトレベルのロールを付与
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:trend-tracker-sa@$PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/run.invoker"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:trend-tracker-sa@$PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/bigquery.dataEditor"
+
+# Secret へのアクセス権を付与
+gcloud secrets add-iam-policy-binding youtube-api-key \
+    --member="serviceAccount:trend-tracker-sa@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor"
+
+
 ```
 
 ### 3. Secret Manager に API キーを登録

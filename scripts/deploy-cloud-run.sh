@@ -30,6 +30,12 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:$SERVICE_ACCOUNT" \
     --role="roles/bigquery.dataEditor" >/dev/null
 
+# Allow the service account to access the secret
+gcloud secrets add-iam-policy-binding youtube-api-key \
+    --member="serviceAccount:$SERVICE_ACCOUNT" \
+    --role="roles/secretmanager.secretAccessor" \
+    --project="$PROJECT_ID" >/dev/null
+
 # Deploy to Cloud Run
 gcloud run deploy "$SERVICE" \
     --image="$IMAGE_URI" \
