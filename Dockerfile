@@ -18,5 +18,7 @@ FROM gcr.io/distroless/base-debian12
 USER nonroot:nonroot
 WORKDIR /srv
 COPY --from=builder /app/fetcher /srv/fetcher
+COPY configs/channels.yaml /srv/channels.yaml
+ENV CHANNEL_CONFIG_PATH=/srv/channels.yaml
 EXPOSE 8080
 ENTRYPOINT ["/srv/fetcher"]

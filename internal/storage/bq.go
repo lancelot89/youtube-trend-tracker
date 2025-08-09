@@ -25,6 +25,7 @@ type BigQueryWriter struct {
 // VideoStatsRecord represents a record to be inserted into BigQuery.
 type VideoStatsRecord struct {
 	TS          time.Time `bigquery:"ts"`
+	SnapshotDate time.Time `bigquery:"snapshot_date"` // Add this field
 	ChannelID   string    `bigquery:"channel_id"`
 	VideoID     string    `bigquery:"video_id"`
 	Title       string    `bigquery:"title"`
@@ -32,6 +33,7 @@ type VideoStatsRecord struct {
 	Likes       int64    `bigquery:"likes"` // Changed from uint64 to int64
 	Comments    int64    `bigquery:"comments"` // Changed from uint64 to int64
 	PublishedAt time.Time `bigquery:"published_at"`
+	InsertID    string    `bigquery:"insert_id"`
 }
 
 // EnsureTableExists checks if the dataset and table exist, and creates them if they don't.
@@ -56,7 +58,18 @@ func (w *BigQueryWriter) EnsureTableExists(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("failed to load schema: %w", err)
 			}
-			if err := table.Create(ctx, &bigquery.TableMetadata{Schema: schema}); err != nil {
+			tableMetadata := &bigquery.TableMetadata{
+				Schema: schema,
+				TimePartitioning: &bigquery.TimePartitioning{
+					Field:      "snapshot_date",
+					Type:       bigquery.TimePartitioningTypeDay,
+					Expiration: 0, // No expiration
+				},
+				Clustering: &bigquery.Clustering{
+					Fields: []string{"channel_id", "video_id"},
+				},
+			}
+			if err := table.Create(ctx, tableMetadata); err != nil {
 				return fmt.Errorf("failed to create table: %w", err)
 			}
 		} else {
@@ -71,13 +84,15 @@ func getSchemaJSON() []byte {
 	// For simplicity here, it's embedded.
 	return []byte(`[
 	  {"name": "ts",           "type": "TIMESTAMP", "mode": "REQUIRED"},
+	  {"name": "snapshot_date", "type": "DATE",      "mode": "REQUIRED"},
 	  {"name": "channel_id",   "type": "STRING",    "mode": "REQUIRED"},
 	  {"name": "video_id",     "type": "STRING",    "mode": "REQUIRED"},
 	  {"name": "title",        "type": "STRING",    "mode": "NULLABLE"},
 	  {"name": "views",        "type": "INTEGER",   "mode": "NULLABLE"},
 	  {"name": "likes",        "type": "INTEGER",   "mode": "NULLABLE"},
 	  {"name": "comments",     "type": "INTEGER",   "mode": "NULLABLE"},
-	  {"name": "published_at", "type": "TIMESTAMP", "mode": "NULLABLE"}
+	  {"name": "published_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+	  {"name": "insert_id",    "type": "STRING",    "mode": "REQUIRED"}
 	]`)
 }
 
