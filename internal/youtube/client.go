@@ -1,4 +1,4 @@
-	"github.com/lancelop89/youtube-trend-tracker/internal/youtube"
+package youtube
 
 import (
 	"context"

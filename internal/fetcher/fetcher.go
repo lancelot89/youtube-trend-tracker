@@ -49,14 +49,14 @@ func NewFetcher(ytClient *youtube.Client, bqWriter *storage.BigQueryWriter) *Fet
 }
 
 // FetchAndStore fetches video statistics from YouTube and stores them in BigQuery.
-func (f *Fetcher) FetchAndStore(ctx context.Context, channelIDs []string) error {
+func (f *Fetcher) FetchAndStore(ctx context.Context, channelIDs []string, maxVideosPerChannel int64) error {
 	logJSON("info", "Starting fetch and store process...", nil, nil)
 
 	for _, channelID := range channelIDs {
 		logJSON("info", fmt.Sprintf("Processing channel: %s", channelID), nil, map[string]string{"channel_id": channelID})
 
 		// Use the unified FetchChannelVideos method
-		videos, err := f.ytClient.FetchChannelVideos(ctx, channelID, 10) // Fetch latest 10 videos
+		videos, err := f.ytClient.FetchChannelVideos(ctx, channelID, maxVideosPerChannel) // Fetch latest N videos
 		if err != nil {
 			logJSON("error", fmt.Sprintf("Error fetching videos for channel %s", channelID), err, map[string]string{"channel_id": channelID})
 			continue

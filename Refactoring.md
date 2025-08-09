@@ -1,92 +1,249 @@
-# YouTubeトレンドトラッカー｜修正すべき点（AI実装向けタスクリスト）
+# 修正をおすすめするポイント（重要度順）
 
-> 目的: **最小で Cloud Run→（認証）→ BigQuery まで通す**。その後に冪等性・運用最適化を段階的に追加する。
->
-> 想定スタック: Go 1.22/1.23, Cloud Run, Cloud Scheduler(OIDC), BigQuery（日次パーティション/クラスタリング）, Artifact Registry。
+## A. すぐ直す/確認する系
 
----
+1. **Go バージョンの扱い**
 
-## ✅ 優先度: 高（先にやる）
+   * 現在は **Go 1.24.6 で問題なし**。そのままで OK。
+   * **CI/ビルダー/Buildpacks** の Go バージョンピン留めを確認（GitHub Actions・Cloud Build の `setup-go` / `go` バージョン一致）。
+   * Docker ベースイメージ（`golang:1.24.6-alpine` など）は **digest ピン留め**を検討（サプライチェーン安定化）。
 
-### \[1] ビルド不能な `...` の除去・実装補完
+2. **モジュールパスの実リポジトリ化**
 
-* **対象**: `internal/youtube/client.go`, `internal/storage/bq.go`, `cmd/fetcher/main.go`, `Dockerfile`, `scripts/*`
-* **やること**:
+   * `go.mod` の `module` を実パスへ（例: `github.com/lancelop89/youtube-trend-tracker`）。
+   * 依存整理: `go mod tidy`、相対 import の残骸を排除。
 
-  * すべての `...`（プレースホルダ）を削除し、機能するコードを実装
-  * 最小限のフロー（YouTube API取得→整形→BQ挿入）を動作させる
-* **ポイント**: Gemini CLI編集時はファイル単位で修正を進め、`go build ./...` が通ることを都度確認
+3. **環境変数名の統一**
 
-### \[2] Go バージョン統一
+   * `GOOGLE_CLOUD_PROJECT` に統一（Cloud Run が自動注入）。
+   * フォールバックで `PROJECT_ID` を読んでもよいが、**どちらが正として優先か**をコードに明記。
 
-* **現状**: `go.mod`= `go 1.24.3`、Docker= `golang:1.22-alpine`
-* **やること**:
+4. **`CHANNEL_CONFIG_PATH`**\*\* の配布方法\*\*
 
-  * `go.mod` と Dockerfile の Go バージョンを同一に
-  * バージョン差異で発生する依存ライブラリ不一致を防ぐ
+   * 本番は **ボリュームマウント不可** ⇒ **コンテナ同梱**（推奨）または **`CHANNELS_JSON`**\*\* を ENV 供給\*\*。
+   * Dockerfile に `COPY configs/channels.yaml /srv/channels.yaml`、`ENV CHANNEL_CONFIG_PATH=/srv/channels.yaml`。
 
-### \[3] Cloud Run 設定受け渡し方式の修正（ConfigMap 廃止）
+5. **`godotenv`**\*\* の取り扱い\*\*
 
-* **課題**: K8s前提の `configMapKeyRef` はCloud Runで使えない
-* **修正案**: 環境変数や Secret Manager 経由で設定を受け渡す
-* **Gemini CLIでの留意点**: YAML編集はインデント崩れやスペース/タブ混在を避ける
+   * 本番で `.env` は使わない。
+   * `if isLocal()` のように **ローカル限定で Load** する条件分岐に。
 
-### \[4] コンテナレジストリ表記の統一
+## B. 品質/運用向上
 
-* Artifact Registry推奨。`gcr.io` 参照部分を一括置換
-* CLI編集時は`service.yaml`とREADMEをセットで修正
+6. **BigQuery スキーマ/パーティション設計**
 
-### \[5] Cloud Scheduler→Cloud Run 呼び出しのOIDC化
+   * 追記テーブルは **`snapshot_date`**\*\* パーティション\*\*＋**`channel_id, video_id`**\*\*\*\*\*\*\*\* クラスタ**。
+   * **`insertId`** を `video_id||'-'||FORMAT_DATE('%F', snapshot_date)` 等で指定し重複防止。
+   * データセット/リージョンは Cloud Run と同系。
 
-* SA作成、`oidcToken`設定、`audience`一致の確認
-* CLI上でのJSON編集は構文ミスを避けるため整形ツールを利用
+7. **レート制御とリトライ**（YouTube Data API）
 
-### \[6] BigQuery スキーマ運用改善
+   * **指数バックオフ**（429/5xx、`Retry-After` 尊重）。
+   * **取得上限**（1 日の最大件数・ページ数）を ENV で外出し。
+   * ETag を活用できる API では `If-None-Match` による節約も検討。
 
-* パーティション（日次）＋クラスタリング（video\_id）を設定
-* CLI修正時は`schema.json`を直接編集せず、`bq mk`コマンドで適用する方針
+8. **構造化ログ**
 
-### \[7] 重複対策・冪等性確保
+   * JSON で `severity` / `message` / `labels`（`video_id`/`channel_id`/`job`）を出力。
+   * 失敗時は `error` レベルに stack/原因を含める。
 
-* `ts, video_id` をキーにした MERGE運用またはビューの一意化ロジックを追加
+9. **ヘルスチェック/メタ情報エンドポイント**
 
-### \[8] YouTube API 呼び出しの堅牢化
+   * `GET /healthz`（200）と `GET /info`（version, commit, build\_ts）。
+   * Cloud Run の起動確認・運用トラブルシュートが楽になる。
 
-* ページング・指数バックオフ・NULL安全化を必須化
-* CLI編集時はテスト関数を追加し、API制限時の挙動も確認
+10. **テスト戦略の分離**
 
-### \[9] エミュレータ/本番切替
+* `-tags integration` で結合テスト（実 API）を分離。
+* ユニットはモック/レコーダーで安定化。CI は基本ユニットのみ。
 
-* `BIGQUERY_EMULATOR_HOST` の有無で認証処理を分岐
-* `.env.example` と README を更新し、CLIからの環境変数差し替え手順を明記
+11. **Dockerfile の微調整**
 
-### \[10] 構造化ログ（JSON）化
+* `ENV PORT=8080` を明示、アプリ側で可変 PORT に対応。
+* マルチステージで **最終イメージを distroless**（既に採用なら維持）。
+* 不要ツールを削ぎ、`USER nonroot` を検討。
 
-* Cloud Loggingでのフィルタ・解析を容易にするためJSON出力に統一
-* CLI実装時は構造体定義とマーシャル処理を共通化
+12. **スクリプトの堅牢化**
 
----
+* `set -euo pipefail` を先頭に。
+* 既存確認 → 作成の分岐で `jq` を使用し JSON を厳密に扱う。
+* 失敗時に明確な exit code とメッセージ。
 
-## 🧱 実装サンプル（Gemini CLI参考用）
+## C. あったら嬉しい（中期）
 
-* Dockerfileのマルチステージビルド例
-* YouTube API クライアント骨子
-* BigQuery作成コマンド例
-* いずれも直接貼り付け可能な形式で記述
-
----
-
-## 🔧 中〜低優先
-
-* アーキ図と実装の差異解消（READMEに反映）
-* 不要コードの削除、テストコード作成
+* **Terraform/IaC**：Cloud Run / Scheduler / SA / Secret / IAM / BQ をコード化。
+* **Looker Studio 用 SQL/ビュー**：`/deployments/bq/` に保存。
+* **セキュリティ強化**：Workload Identity Federation（必要に応じて）、Secret 自動ローテ。
+* **監視**：Error Reporting、アラート（エラー率・429 連発・BQ 失敗）。
 
 ---
 
-## ✅ 受け入れ基準（Definition of Done）
+# 目的 / スコープ
 
-* Dockerビルド成功＆Cloud Runデプロイ可能
-* SchedulerからOIDC認証で正常応答
-* BigQueryに日次パーティション・クラスタリング済みデータが投入される
-* 重複行が論理的に排除される
-* Cloud Loggingで主要フィールドのフィルタ・分析が可能
+* 収集対象は **動画・チャンネルのメタ情報＋集計値（コメントは“数のみ”）**。
+* BigQuery は **追記型スナップショット**を基本にし、\*\*最新ビュー（or ディメンション）\*\*を別途維持。
+* テーブルは **日次パーティション**＋**クラスタリング**でコスト最適化。
+* Cloud Run からの実行・Cloud Scheduler で定期実行・Secret Manager で鍵管理。
+
+---
+
+# データモデル（BigQuery）
+
+## 共通ポリシー
+
+* **パーティション列**: `snapshot_date` (DATE)
+* **クラスタ列**: `channel_id, video_id`（テーブルに応じて片方のみ）
+* **重複排除**: `insertId` を `(resource_id || '-' || snapshot_date)` などで指定
+* **タイムスタンプ**: `snapshot_ts TIMESTAMP` を格納（可視化/最新抽出用）
+
+## 1) 動画スナップショット（追記）
+
+```sql
+CREATE TABLE IF NOT EXISTS yt.fact_video_stats_snapshots (
+  snapshot_date   DATE       NOT NULL,
+  snapshot_ts     TIMESTAMP  NOT NULL,
+  video_id        STRING     NOT NULL,
+  channel_id      STRING     NOT NULL,
+  title           STRING,
+  published_at    TIMESTAMP,
+  tags            ARRAY<STRING>,
+  category_id     STRING,
+  duration        STRING,
+  definition      STRING,
+  licensed        BOOL,
+  view_count      INT64,
+  like_count      INT64,
+  comment_count   INT64,
+  etag            STRING,
+  source          STRING
+)
+PARTITION BY snapshot_date
+CLUSTER BY channel_id, video_id;
+```
+
+## 2) チャンネルスナップショット（追記）
+
+```sql
+CREATE TABLE IF NOT EXISTS yt.fact_channel_stats_snapshots (
+  snapshot_date   DATE       NOT NULL,
+  snapshot_ts     TIMESTAMP  NOT NULL,
+  channel_id      STRING     NOT NULL,
+  title           STRING,
+  custom_url      STRING,
+  country         STRING,
+  published_at    TIMESTAMP,
+  subscriber_count INT64,
+  view_count      INT64,
+  video_count     INT64,
+  etag            STRING,
+  source          STRING
+)
+PARTITION BY snapshot_date
+CLUSTER BY channel_id;
+```
+
+## 3) 参照テーブル
+
+```sql
+CREATE TABLE IF NOT EXISTS yt.lu_video_categories (
+  category_id STRING NOT NULL,
+  title       STRING,
+  assignable  BOOL,
+  updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+);
+```
+
+## 4) 最新ビュー/ディメンション
+
+```sql
+CREATE OR REPLACE VIEW yt.vw_latest_video_stats AS
+SELECT * EXCEPT(rn)
+FROM (
+  SELECT t.*, ROW_NUMBER() OVER (PARTITION BY video_id ORDER BY snapshot_ts DESC) AS rn
+  FROM yt.fact_video_stats_snapshots t
+)
+WHERE rn = 1;
+```
+
+---
+
+# 収集 API と上限
+
+* **videos.list**: `snippet,contentDetails,statistics,topicDetails`
+* **channels.list**: `snippet,statistics,brandingSettings`
+* **videoCategories.list**: 参照用
+
+**除外**
+
+* コメント本文は保存せず `comment_count` のみ
+* `search/playlistItems`: 必要になってから導入
+
+**取得制御 ENV 例**
+
+```yaml
+FETCH_LIMITS:
+  max_videos_per_day: 2000
+  max_pages_per_call: 5
+  request_interval_ms: 100
+RETRY:
+  max_retries: 5
+  initial_backoff_ms: 500
+```
+
+---
+
+# Cloud Run / インフラ
+
+## ENV
+
+* `GOOGLE_CLOUD_PROJECT`
+* `YOUTUBE_API_KEY`（Secret Manager）
+* `CHANNEL_CONFIG_PATH=/srv/channels.yaml`
+
+## Secret / 権限
+
+* `roles/bigquery.dataEditor`
+* `roles/secretmanager.secretAccessor`
+
+## 配置
+
+* `configs/channels.yaml` をコンテナに同梱（`COPY` + `ENV`）
+
+## スケジューラ
+
+* Cloud Scheduler → Cloud Run (POST, OIDC)
+
+## ログ/ヘルスチェック
+
+* JSON 構造化ログ
+* `/healthz` `/info`
+
+---
+
+# タスクリスト
+
+*
+
+---
+
+# リファクタリング進捗チェックリスト
+
+## A. すぐ直す/確認する系
+- [x] 1. Go バージョンの扱い (Go 1.24.6 に統一)
+  - [ ] CI/ビルダー/Buildpacks の Go バージョンピン留め (スキップ)
+  - [ ] Docker ベースイメージの digest ピン留め (スキップ)
+- [x] 2. モジュールパスの実リポジトリ化
+- [x] 3. 環境変数名の統一
+- [x] 4. `CHANNEL_CONFIG_PATH` の配布方法
+- [x] 5. `godotenv` の取り扱い
+
+## B. 品質/運用向上
+- [x] 6. BigQuery スキーマ/パーティション設計
+- [x] 7. レート制御とリトライ (指数バックオフは実装済み)
+  - [x] 取得上限の外出し
+  - [ ] ETag の活用 (スキップ)
+- [x] 8. 構造化ログ
+- [x] 9. ヘルスチェック/メタ情報エンドポイント
+- [ ] 10. テスト戦略の分離 (スキップ)
+- [x] 11. Dockerfile の微調整
+- [ ] 12. スクリプトの堅牢化 (スキップ)

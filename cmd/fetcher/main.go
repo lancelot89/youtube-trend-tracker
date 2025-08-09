@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -26,7 +27,7 @@ type Config struct {
 
 // logEntry represents a structured log entry.
 type logEntry struct {
-	Timestamp string            `json:"timestamp"`	
+	Timestamp string            `json:"timestamp"`
 	Level     string            `json:"level"`
 	Message   string            `json:"message"`
 	Error     string            `json:"error,omitempty"`
@@ -89,12 +90,12 @@ var ( // These variables are set at build time
 func infoHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	info := map[string]string{
-		"version":    version,
-		"commit":     commit,
-		"buildTime":  buildTime,
-		"goVersion":  runtime.Version(),
-		"os":         runtime.GOOS,
-		"arch":       runtime.GOARCH,
+		"version":   version,
+		"commit":    commit,
+		"buildTime": buildTime,
+		"goVersion": runtime.Version(),
+		"os":        runtime.GOOS,
+		"arch":      runtime.GOARCH,
 	}
 	json.NewEncoder(w).Encode(info)
 }
@@ -106,11 +107,18 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	apiKey := os.Getenv("YOUTUBE_API_KEY")
 	channelConfigPath := os.Getenv("CHANNEL_CONFIG_PATH")
+	maxVideosPerChannelStr := os.Getenv("MAX_VIDEOS_PER_CHANNEL")
 
 	if projectID == "" || apiKey == "" || channelConfigPath == "" {
 		logJSON("error", "Missing required environment variables (PROJECT_ID, YOUTUBE_API_KEY, CHANNEL_CONFIG_PATH)", nil, nil)
 		http.Error(w, "Server configuration error", http.StatusInternalServerError)
 		return
+	}
+
+	maxVideosPerChannel, err := strconv.ParseInt(maxVideosPerChannelStr, 10, 64)
+	if err != nil || maxVideosPerChannel <= 0 {
+		logJSON("warning", fmt.Sprintf("Invalid MAX_VIDEOS_PER_CHANNEL: %s. Using default 10.", maxVideosPerChannelStr), err, nil)
+		maxVideosPerChannel = 10 // Default value
 	}
 
 	// Read channel config from file
@@ -157,7 +165,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	// --- Execution ---
 	f := fetcher.NewFetcher(ytClient, bqWriter)
-	if err := f.FetchAndStore(ctx, channelIDs); err != nil {
+	if err := f.FetchAndStore(ctx, channelIDs, maxVideosPerChannel); err != nil {
 		logJSON("error", "An error occurred during the fetch and store process", err, nil)
 		http.Error(w, "An error occurred during the fetch and store process", http.StatusInternalServerError)
 		return

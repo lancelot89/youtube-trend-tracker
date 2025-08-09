@@ -62,7 +62,7 @@ func (w *BigQueryWriter) EnsureTableExists(ctx context.Context) error {
 				Schema: schema,
 				TimePartitioning: &bigquery.TimePartitioning{
 					Field:      "snapshot_date",
-					Type:       bigquery.TimePartitioningTypeDay,
+					Type:       "DAY",
 					Expiration: 0, // No expiration
 				},
 				Clustering: &bigquery.Clustering{

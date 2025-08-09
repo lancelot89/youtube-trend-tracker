@@ -154,9 +154,38 @@ cp .env.example .env
 # docker run -p 9060:9060 -p 9061:9061 --name bigquery-emulator -d goccy/bigquery-emulator
 # .env ファイルに BIGQUERY_EMULATOR_HOST=localhost:9060 を設定
 
-# テスト実行
+# 単体テストの実行
+go test ./...
+
+# ローカルでの動作確認
 go run ./cmd/fetcher/main.go --once --debug
 ```
+
+---
+
+## 設定ファイル
+
+本プロジェクトでは、設定を YAML ファイルで管理しています。
+
+- `configs/project.yaml`: プロジェクト全体のメタデータ（モジュール構成、利用する Secret 名など）を定義します。
+- `configs/channels.yaml`: トレンドを監視したい YouTube チャンネルの ID をリスト形式で指定します。
+
+---
+
+## データモデル (BigQuery)
+
+取得した動画データは、以下のスキーマで BigQuery に保存されます。スキーマの詳細は `deployments/bq/schema.json` を参照してください。
+
+| フィールド名   | 型        | 説明                               |
+| :------------- | :-------- | :--------------------------------- |
+| `ts`           | TIMESTAMP | データ取得タイムスタンプ (必須)    |
+| `channel_id`   | STRING    | YouTube チャンネル ID (必須)       |
+| `video_id`     | STRING    | YouTube 動画 ID (必須)             |
+| `title`        | STRING    | 動画タイトル                       |
+| `views`        | INTEGER   | 再生回数                           |
+| `likes`        | INTEGER   | 高評価数                           |
+| `comments`     | INTEGER   | コメント数                         |
+| `published_at` | TIMESTAMP | 動画の公開日時                     |
 
 ---
 
@@ -164,10 +193,10 @@ go run ./cmd/fetcher/main.go --once --debug
 
 | サービス              | 月次想定コスト        | 備考                                            |
 | ----------------- | -------------- | --------------------------------------------- |
-| Cloud Run         | \~¥150         | 1 h 周期, 実行 30 秒 / 回, 256 MiB, 100 万リクエスト/月 未満 |
-| Artifact Registry | \~¥50          | 1 GB ストレージ                                    |
-| BigQuery          | \~¥200         | 2 GB ストレージ + 5 GB クエリ/月                       |
-| Cloud Scheduler   | \~¥0           | 月 730 回は無料枠内                                  |
+| Cloud Run         | ~¥150          | 1 h 周期, 実行 30 秒 / 回, 256 MiB, 100 万リクエスト/月 未満 |
+| Artifact Registry | ~¥50           | 1 GB ストレージ                                    |
+| BigQuery          | ~¥200          | 2 GB ストレージ + 5 GB クエリ/月                       |
+| Cloud Scheduler   | ~¥0            | 月 730 回は無料枠内                                  |
 | 合計                | **≈ ¥400 / 月** | *為替レート & 利用状況で変動*                             |
 
 ---
