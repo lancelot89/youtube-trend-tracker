@@ -199,6 +199,23 @@ go test ./...
 
 # ローカルでの動作確認
 go run ./cmd/fetcher/main.go --once --debug
+
+### GCP 環境での動作確認
+
+デプロイ済みの Cloud Run サービスをローカルからトリガーして動作を確認します。
+
+1.  **Cloud Run サービスの URL を取得**:
+    ```bash
+    SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region=${REGION} --format="value(status.url)")
+    echo "Cloud Run Service URL: ${SERVICE_URL}"
+    ```
+2.  **サービスをトリガー**:
+    Cloud Run サービスは認証を必要とするため、`gcloud auth print-identity-token` で認証トークンを取得し、`Authorization` ヘッダーに含めてリクエストを送信します。
+    ```bash
+    AUTH_TOKEN=$(gcloud auth print-identity-token)
+    curl -X POST -H "Authorization: Bearer ${AUTH_TOKEN}" ${SERVICE_URL}
+    ```
+    成功すると `{"status":"success"}` が返されます。
 ```
 
 ---
