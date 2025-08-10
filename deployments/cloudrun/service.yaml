@@ -12,7 +12,7 @@ spec:
         - name: GOOGLE_CLOUD_PROJECT
           value: ${PROJECT_ID}
         - name: CHANNEL_CONFIG_PATH
-          value: /srv/configs/channels.yaml
+          value: /srv/channels.yaml
         - name: MAX_VIDEOS_PER_CHANNEL
           value: "200"
         - name: YOUTUBE_API_KEY

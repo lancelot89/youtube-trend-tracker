@@ -161,10 +161,10 @@ docker push "$REGION"-docker.pkg.dev/"$PROJECT_ID"/"$AR_REPO"/tracker:latest
 gcloud run deploy "$SERVICE_NAME" \
   --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_NAME}:latest" \
   --service-account="trend-tracker-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
-  --set-secrets="YOUTUBE_API_KEY=youtube-api-key:latest" \
   --region="$REGION" \
   --platform=managed \
-  --no-allow-unauthenticated
+  --no-allow-unauthenticated \
+  --config-file deployments/cloudrun/service.yaml
 ```
 
 ### 6. Cloud Scheduler の作成
@@ -218,14 +218,18 @@ go run ./cmd/fetcher/main.go --once --debug
 
 | フィールド名   | 型        | 説明                               |
 | :------------- | :-------- | :--------------------------------- |
-| `ts`           | TIMESTAMP | データ取得タイムスタンプ (必須)    |
+| `dt`           | DATE      | スナップショット日付 (必須)        |
 | `channel_id`   | STRING    | YouTube チャンネル ID (必須)       |
 | `video_id`     | STRING    | YouTube 動画 ID (必須)             |
 | `title`        | STRING    | 動画タイトル                       |
+| `channel_name` | STRING    | チャンネル名                       |
+| `tags`         | STRING    | 動画タグ (繰り返し)                |
+| `is_short`     | BOOLEAN   | ショート動画フラグ                 |
 | `views`        | INTEGER   | 再生回数                           |
 | `likes`        | INTEGER   | 高評価数                           |
 | `comments`     | INTEGER   | コメント数                         |
 | `published_at` | TIMESTAMP | 動画の公開日時                     |
+| `created_at`   | TIMESTAMP | データ取得タイムスタンプ (必須)    |
 
 ---
 

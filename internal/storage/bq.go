@@ -25,18 +25,18 @@ type BigQueryWriter struct {
 
 // VideoStatsRecord represents a record to be inserted into BigQuery.
 type VideoStatsRecord struct {
-	TS           time.Time  `bigquery:"ts"`
-	SnapshotDate civil.Date `bigquery:"snapshot_date"` // Add this field
+	Dt           civil.Date `bigquery:"dt"`
 	ChannelID    string     `bigquery:"channel_id"`
 	VideoID      string     `bigquery:"video_id"`
 	Title        string     `bigquery:"title"`
-	ChannelName  string     `bigquery:"channel_name"` // Add this field
-	Tags         []string   `bigquery:"tags"`         // Add this field
-	Views        int64      `bigquery:"views"`    // Changed from uint64 to int64
-	Likes        int64      `bigquery:"likes"`    // Changed from uint64 to int64
-	Comments     int64      `bigquery:"comments"` // Changed from uint64 to int64
+	ChannelName  string     `bigquery:"channel_name"`
+	Tags         []string   `bigquery:"tags"`
+	IsShort      bool       `bigquery:"is_short"`
+	Views        int64      `bigquery:"views"`
+	Likes        int64      `bigquery:"likes"`
+	Comments     int64      `bigquery:"comments"`
 	PublishedAt  time.Time  `bigquery:"published_at"`
-	InsertID     string     `bigquery:"insert_id"`
+	CreatedAt    time.Time  `bigquery:"created_at"`
 }
 
 // EnsureTableExists checks if the dataset and table exist, and creates them if they don't.
@@ -64,7 +64,7 @@ func (w *BigQueryWriter) EnsureTableExists(ctx context.Context) error {
 			tableMetadata := &bigquery.TableMetadata{
 				Schema: schema,
 				TimePartitioning: &bigquery.TimePartitioning{
-					Field:      "snapshot_date",
+					Field:      "dt",
 					Type:       "DAY",
 					Expiration: 0, // No expiration
 				},
@@ -86,18 +86,18 @@ func getSchemaJSON() []byte {
 	// In a real application, you would load this from a file.
 	// For simplicity here, it's embedded.
 	return []byte(`[
-	  {"name": "ts",           "type": "TIMESTAMP", "mode": "REQUIRED"},
-	  {"name": "snapshot_date", "type": "DATE",      "mode": "REQUIRED"},
+	  {"name": "dt",           "type": "DATE",      "mode": "REQUIRED"},
 	  {"name": "channel_id",   "type": "STRING",    "mode": "REQUIRED"},
 	  {"name": "video_id",     "type": "STRING",    "mode": "REQUIRED"},
 	  {"name": "title",        "type": "STRING",    "mode": "NULLABLE"},
 	  {"name": "channel_name", "type": "STRING",    "mode": "NULLABLE"},
 	  {"name": "tags",         "type": "STRING",    "mode": "REPEATED"},
+	  {"name": "is_short",     "type": "BOOLEAN",   "mode": "NULLABLE"},
 	  {"name": "views",        "type": "INTEGER",   "mode": "NULLABLE"},
 	  {"name": "likes",        "type": "INTEGER",   "mode": "NULLABLE"},
 	  {"name": "comments",     "type": "INTEGER",   "mode": "NULLABLE"},
 	  {"name": "published_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
-	  {"name": "insert_id",    "type": "STRING",    "mode": "REQUIRED"}
+	  {"name": "created_at",   "type": "TIMESTAMP", "mode": "REQUIRED"}
 	]`)
 }
 

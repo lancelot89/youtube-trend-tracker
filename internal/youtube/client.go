@@ -19,6 +19,7 @@ type Video struct {
 	Title       string
 	ChannelName string
 	Tags        []string
+	IsShort     bool
 	Views       uint64
 	Likes       uint64
 	Comments    uint64
@@ -95,7 +96,7 @@ func (c *Client) FetchChannelVideos(ctx context.Context, channelID string, maxRe
 		var vResp *yt.VideoListResponse
 		var err error
 		for i := 0; i < 5; i++ { // Max 5 retries
-			vResp, err = c.service.Videos.List([]string{"snippet", "statistics"}).Id(batchIDs...).Do()
+			vResp, err = c.service.Videos.List([]string{"snippet", "statistics", "contentDetails"}).Id(batchIDs...).Do()
 			if err == nil {
 				break
 			}
@@ -119,7 +120,14 @@ func (c *Client) FetchChannelVideos(ctx context.Context, channelID string, maxRe
 				comments = item.Statistics.CommentCount
 			}
 			pub, _ := time.Parse(time.RFC3339, item.Snippet.PublishedAt)
-			allVideos = append(allVideos, &Video{ID: item.Id, Title: item.Snippet.Title, ChannelName: channelName, Tags: item.Snippet.Tags, Views: views, Likes: likes, Comments: comments, PublishedAt: pub})
+			isShort := false
+			if item.ContentDetails != nil {
+				duration, err := time.ParseDuration(item.ContentDetails.Duration[2:]) // Remove "PT" prefix
+				if err == nil && duration <= 60*time.Second {
+					isShort = true
+				}
+			}
+			allVideos = append(allVideos, &Video{ID: item.Id, Title: item.Snippet.Title, ChannelName: channelName, Tags: item.Snippet.Tags, IsShort: isShort, Views: views, Likes: likes, Comments: comments, PublishedAt: pub})
 		}
 	}
 	return allVideos, nil
