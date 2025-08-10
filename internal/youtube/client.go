@@ -17,6 +17,8 @@ type Client struct {
 type Video struct {
 	ID          string
 	Title       string
+	ChannelName string
+	Tags        []string
 	Views       uint64
 	Likes       uint64
 	Comments    uint64
@@ -33,10 +35,11 @@ func NewClient(ctx context.Context, apiKey string) (*Client, error) {
 
 // FetchChannelVideos returns latest N videos with snippet/statistics.
 func (c *Client) FetchChannelVideos(ctx context.Context, channelID string, maxResults int64) ([]*Video, error) {
-	ch, err := c.service.Channels.List([]string{"contentDetails"}).Id(channelID).Do()
+	ch, err := c.service.Channels.List([]string{"contentDetails", "snippet"}).Id(channelID).Do()
 	if err != nil || len(ch.Items) == 0 {
 		return nil, fmt.Errorf("channels.list: %w", err)
 	}
+	channelName := ch.Items[0].Snippet.Title
 	uploads := ch.Items[0].ContentDetails.RelatedPlaylists.Uploads
 
 	var allVideoIDs []string
@@ -116,7 +119,7 @@ func (c *Client) FetchChannelVideos(ctx context.Context, channelID string, maxRe
 				comments = item.Statistics.CommentCount
 			}
 			pub, _ := time.Parse(time.RFC3339, item.Snippet.PublishedAt)
-			allVideos = append(allVideos, &Video{ID: item.Id, Title: item.Snippet.Title, Views: views, Likes: likes, Comments: comments, PublishedAt: pub})
+			allVideos = append(allVideos, &Video{ID: item.Id, Title: item.Snippet.Title, ChannelName: channelName, Tags: item.Snippet.Tags, Views: views, Likes: likes, Comments: comments, PublishedAt: pub})
 		}
 	}
 	return allVideos, nil

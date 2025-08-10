@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"cloud.google.com/go/civil"
 	"github.com/lancelop89/youtube-trend-tracker/internal/storage"
 	"github.com/lancelop89/youtube-trend-tracker/internal/youtube"
 )
 
 // logEntry represents a structured log entry.
 type logEntry struct {
-	Timestamp string            `json:"timestamp"`	
+	Timestamp string            `json:"timestamp"`
 	Level     string            `json:"level"`
 	Message   string            `json:"message"`
 	Error     string            `json:"error,omitempty"`
@@ -65,16 +66,18 @@ func (f *Fetcher) FetchAndStore(ctx context.Context, channelIDs []string, maxVid
 		var records []*storage.VideoStatsRecord
 		for _, video := range videos {
 			records = append(records, &storage.VideoStatsRecord{
-				TS:          time.Now(),
-				SnapshotDate: time.Now().Truncate(24 * time.Hour), // Set SnapshotDate
-				ChannelID:   channelID, // Use the channelID from the loop
-				VideoID:     video.ID,
-				Title:       video.Title,
-				Views:       int64(video.Views),
-				Likes:       int64(video.Likes),
-				Comments:    int64(video.Comments),
-				PublishedAt: video.PublishedAt,
-				InsertID:    fmt.Sprintf("%s-%s", video.ID, time.Now().Format("2006-01-02")),
+				TS:           time.Now(),
+				SnapshotDate: todayJST(), // Set SnapshotDate
+				ChannelID:    channelID,  // Use the channelID from the loop
+				VideoID:      video.ID,
+				Title:        video.Title,
+				ChannelName:  video.ChannelName, // Add this field
+				Tags:         video.Tags,        // Add this field
+				Views:        int64(video.Views),
+				Likes:        int64(video.Likes),
+				Comments:     int64(video.Comments),
+				PublishedAt:  video.PublishedAt,
+				InsertID:     fmt.Sprintf("%s-%s", video.ID, time.Now().Format("2006-01-02")),
 			})
 		}
 
@@ -87,4 +90,9 @@ func (f *Fetcher) FetchAndStore(ctx context.Context, channelIDs []string, maxVid
 
 	logJSON("info", "Fetch and store process completed.", nil, nil)
 	return nil
+}
+
+func todayJST() civil.Date {
+	t := time.Now()
+	return civil.DateOf(t)
 }

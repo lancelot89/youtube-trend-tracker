@@ -1,6 +1,4 @@
 channels:
-  # Google Developers
-  - id: UC_x5XG1OV2P6uZZ5FSM9Ttw
   # 監視したいチャンネルを追加
   - id: UCG_oqDSlIYEspNpd2H4zWhw # RehacQ
   - id: UC8yHePe_RgUBE-waRWy6olw # PIVOT

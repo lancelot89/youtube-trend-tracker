@@ -5,13 +5,18 @@ metadata:
 spec:
   template:
     spec:
+      serviceAccountName: trend-tracker-sa@${PROJECT_ID}.iam.gserviceaccount.com
       containers:
-      - image: us-central1-docker.pkg.dev/PROJECT_ID/trend-tracker-repo/fetcher
+      - image: ${REGION}-docker.pkg.dev/${PROJECT_ID}/trend-tracker-repo/fetcher:${TAG}
         env:
+        - name: GOOGLE_CLOUD_PROJECT
+          value: ${PROJECT_ID}
+        - name: CHANNEL_CONFIG_PATH
+          value: /srv/configs/channels.yaml
+        - name: MAX_VIDEOS_PER_CHANNEL
+          value: "200"
         - name: YOUTUBE_API_KEY
           valueFrom:
             secretKeyRef:
               name: youtube-api-key
               key: latest
-        - name: CHANNEL_CONFIG_PATH
-          value: /app/configs/channels.yaml

@@ -51,7 +51,7 @@ chmod +x scripts/*.sh
 
 ```bash
 # 1. 環境変数の設定
-export PROJECT_ID="your-gcp-project-id"
+export PROJECT_ID="PROJECT_ID_REDACTED"
 export REGION="asia-northeast1"          # 例: us-central1, asia-northeast1
 export AR_REPO="youtube-trend-repo"      # Artifact Registry のリポジトリ名
 export SERVICE_NAME="youtube-trend-tracker" # Cloud Run のサービス名
@@ -85,8 +85,7 @@ echo -e "\n\n✅ 全てのデプロイプロセスが完了しました。"
 
 ```bash
 ./scripts/redeploy.sh "${PROJECT_ID}" "${REGION}" "${AR_REPO}" "${SERVICE_NAME}"
-```}``````json
-{
+```
 
 > **備考**: 各スクリプトは冪等性を持つように作られていますが、IAMやSecretなど、環境に依存する値がハードコードされている場合があります。必要に応じて `scripts/` ディレクトリ内のスクリプトを直接編集してください。
 
@@ -250,6 +249,7 @@ gcloud scheduler jobs delete trend-tracker-hourly
 gcloud artifacts repositories delete "$AR_REPO" --location="$REGION" --quiet
 gcloud secrets delete youtube-api-key
 ```
+
 
 ---
 

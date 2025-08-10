@@ -53,6 +53,19 @@ func isLocal() bool {
 	return os.Getenv("GO_ENV") == "local"
 }
 
+func getProjectID() (string, error) {
+	if v := os.Getenv("PROJECT_ID"); v != "" {
+		return v, nil
+	}
+	if v := os.Getenv("GOOGLE_CLOUD_PROJECT"); v != "" {
+		return v, nil
+	}
+	// if metadata.OnGCE() {
+	// 	return metadata.ProjectID()
+	// }
+	return "", fmt.Errorf("project ID not found")
+}
+
 func main() {
 	if isLocal() {
 		err := godotenv.Load()
