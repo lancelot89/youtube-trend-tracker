@@ -31,7 +31,7 @@ type logEntry struct {
 	Level     string            `json:"level"`
 	Message   string            `json:"message"`
 	Error     string            `json:"error,omitempty"`
-	Labels    map[string]string `json:"labels,omitempty"` // Add this field
+	Labels    map[string]string `json:"labels,omitempty"`
 }
 
 func logJSON(level, msg string, err error, labels map[string]string) {
@@ -46,34 +46,43 @@ func logJSON(level, msg string, err error, labels map[string]string) {
 	}
 
 	jsonBytes, _ := json.Marshal(entry)
-	fmt.Println(string(jsonBytes)) // Use fmt.Println to ensure newline
+	fmt.Println(string(jsonBytes))
 }
 
 func isLocal() bool {
 	return os.Getenv("GO_ENV") == "local"
 }
 
-func getProjectID() (string, error) {
-	if v := os.Getenv("PROJECT_ID"); v != "" {
-		return v, nil
+func main() {
+	// Attempt to load .env file for local development.
+	// This will be ignored in production environments where .env doesn't exist.
+	err := godotenv.Load()
+	if err != nil {
+		// This is not a fatal error, just a warning for local dev.
+		logJSON("warning", "Could not load .env file", err, nil)
 	}
-	if v := os.Getenv("GOOGLE_CLOUD_PROJECT"); v != "" {
-		return v, nil
+
+	// Check if running as a server or a one-off script
+	if os.Getenv("RUN_AS_SERVER") == "true" {
+		startServer()
+	} else {
+		runScript()
 	}
-	// if metadata.OnGCE() {
-	// 	return metadata.ProjectID()
-	// }
-	return "", fmt.Errorf("project ID not found")
 }
 
-func main() {
-	if isLocal() {
-		err := godotenv.Load()
-		if err != nil {
-			logJSON("warning", "Error loading .env file", err, nil)
-		}
+// runScript executes the fetcher logic as a command-line script.
+func runScript() {
+	logJSON("info", "Running fetcher as a one-off script.", nil, nil)
+	ctx := context.Background()
+	if err := runFetcher(ctx); err != nil {
+		logJSON("fatal", "Fetcher script failed", err, nil)
+		os.Exit(1)
 	}
+	logJSON("info", "Fetcher script completed successfully.", nil, nil)
+}
 
+// startServer starts the HTTP server.
+func startServer() {
 	http.HandleFunc("/", handler)
 	http.HandleFunc("/healthz", healthzHandler)
 	http.HandleFunc("/info", infoHandler)
@@ -83,11 +92,87 @@ func main() {
 		port = "8080"
 	}
 
-	logJSON("info", fmt.Sprintf("Listening on port %s", port), nil, nil)
+	logJSON("info", fmt.Sprintf("Starting HTTP server, listening on port %s", port), nil, nil)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		logJSON("fatal", "Server failed to start", err, nil)
-		os.Exit(1) // Exit on fatal error
+		os.Exit(1)
 	}
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := runFetcher(ctx); err != nil {
+		logJSON("error", "An error occurred during the fetch and store process", err, nil)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
+func runFetcher(ctx context.Context) error {
+	// --- Configuration ---
+	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	apiKey := os.Getenv("YOUTUBE_API_KEY")
+	channelConfigPath := os.Getenv("CHANNEL_CONFIG_PATH")
+	maxVideosPerChannelStr := os.Getenv("MAX_VIDEOS_PER_CHANNEL")
+
+	if projectID == "" || apiKey == "" || channelConfigPath == "" {
+		return fmt.Errorf("missing required environment variables (GOOGLE_CLOUD_PROJECT, YOUTUBE_API_KEY, CHANNEL_CONFIG_PATH)")
+	}
+	if apiKey == "YOUR_YOUTUBE_API_KEY" {
+		return fmt.Errorf("placeholder API key found. Please replace YOUR_YOUTUBE_API_KEY in your .env file")
+	}
+
+	maxVideosPerChannel, err := strconv.ParseInt(maxVideosPerChannelStr, 10, 64)
+	if err != nil || maxVideosPerChannel <= 0 {
+		logJSON("warning", fmt.Sprintf("Invalid or missing MAX_VIDEOS_PER_CHANNEL, using default 10."), nil, nil)
+		maxVideosPerChannel = 10 // Default value
+	}
+
+	// Read channel config from file
+	logJSON("info", "Reading channel configuration", nil, map[string]string{"path": channelConfigPath})
+	channelConfigBytes, err := ioutil.ReadFile(channelConfigPath)
+	if err != nil {
+		return fmt.Errorf("error reading channel config file at %s: %w", channelConfigPath, err)
+	}
+
+	var config Config
+	if err := yaml.Unmarshal(channelConfigBytes, &config); err != nil {
+		return fmt.Errorf("error parsing channel config yaml: %w", err)
+	}
+
+	var channelIDs []string
+	for _, ch := range config.Channels {
+		channelIDs = append(channelIDs, ch.ID)
+	}
+	logJSON("info", fmt.Sprintf("Found %d channels to process", len(channelIDs)), nil, nil)
+
+	// --- Initialization ---
+	logJSON("info", "Initializing clients...", nil, nil)
+	ytClient, err := youtube.NewClient(ctx, apiKey)
+	if err != nil {
+		return fmt.Errorf("error creating YouTube client: %w", err)
+	}
+
+	bqWriter, err := storage.NewBigQueryWriter(ctx, projectID)
+	if err != nil {
+		return fmt.Errorf("error creating BigQuery writer: %w", err)
+	}
+
+	// Ensure the table exists before proceeding.
+	if err := bqWriter.EnsureTableExists(ctx); err != nil {
+		return fmt.Errorf("error ensuring BigQuery table exists: %w", err)
+	}
+	logJSON("info", "Clients initialized and table checked successfully.", nil, nil)
+
+	// --- Execution ---
+	f := fetcher.NewFetcher(ytClient, bqWriter)
+	if err := f.FetchAndStore(ctx, channelIDs, maxVideosPerChannel); err != nil {
+		return fmt.Errorf("an error occurred during the fetch and store process: %w", err)
+	}
+
+	return nil
 }
 
 func healthzHandler(w http.ResponseWriter, r *http.Request) {
@@ -111,80 +196,4 @@ func infoHandler(w http.ResponseWriter, r *http.Request) {
 		"arch":      runtime.GOARCH,
 	}
 	json.NewEncoder(w).Encode(info)
-}
-
-func handler(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
-
-	// --- Configuration ---
-	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
-	apiKey := os.Getenv("YOUTUBE_API_KEY")
-	channelConfigPath := os.Getenv("CHANNEL_CONFIG_PATH")
-	maxVideosPerChannelStr := os.Getenv("MAX_VIDEOS_PER_CHANNEL")
-
-	if projectID == "" || apiKey == "" || channelConfigPath == "" {
-		logJSON("error", "Missing required environment variables (PROJECT_ID, YOUTUBE_API_KEY, CHANNEL_CONFIG_PATH)", nil, nil)
-		http.Error(w, "Server configuration error", http.StatusInternalServerError)
-		return
-	}
-
-	maxVideosPerChannel, err := strconv.ParseInt(maxVideosPerChannelStr, 10, 64)
-	if err != nil || maxVideosPerChannel <= 0 {
-		logJSON("warning", fmt.Sprintf("Invalid MAX_VIDEOS_PER_CHANNEL: %s. Using default 10.", maxVideosPerChannelStr), err, nil)
-		maxVideosPerChannel = 10 // Default value
-	}
-
-	// Read channel config from file
-	channelConfigBytes, err := ioutil.ReadFile(channelConfigPath)
-	if err != nil {
-		logJSON("error", "Error reading channel config file", err, nil)
-		http.Error(w, "Invalid channel configuration file", http.StatusInternalServerError)
-		return
-	}
-
-	var config Config
-	if err := yaml.Unmarshal(channelConfigBytes, &config); err != nil {
-		logJSON("error", "Error parsing channel config", err, nil)
-		http.Error(w, "Invalid channel configuration", http.StatusBadRequest)
-		return
-	}
-
-	var channelIDs []string
-	for _, ch := range config.Channels {
-		channelIDs = append(channelIDs, ch.ID)
-	}
-
-	// --- Initialization ---
-	ytClient, err := youtube.NewClient(ctx, apiKey)
-	if err != nil {
-		logJSON("error", "Error creating YouTube client", err, nil)
-		http.Error(w, "Failed to create YouTube client", http.StatusInternalServerError)
-		return
-	}
-
-	bqWriter, err := storage.NewBigQueryWriter(ctx, projectID)
-	if err != nil {
-		logJSON("error", "Error creating BigQuery writer", err, nil)
-		http.Error(w, "Failed to create BigQuery writer", http.StatusInternalServerError)
-		return
-	}
-
-	// Ensure the table exists before proceeding.
-	if err := bqWriter.EnsureTableExists(ctx); err != nil {
-		logJSON("error", "Error ensuring BigQuery table exists", err, nil)
-		http.Error(w, "Failed to setup BigQuery table", http.StatusInternalServerError)
-		return
-	}
-
-	// --- Execution ---
-	f := fetcher.NewFetcher(ytClient, bqWriter)
-	if err := f.FetchAndStore(ctx, channelIDs, maxVideosPerChannel); err != nil {
-		logJSON("error", "An error occurred during the fetch and store process", err, nil)
-		http.Error(w, "An error occurred during the fetch and store process", http.StatusInternalServerError)
-		return
-	}
-
-	// --- Response ---
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }

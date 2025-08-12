@@ -66,18 +66,21 @@ func (f *Fetcher) FetchAndStore(ctx context.Context, channelIDs []string, maxVid
 		var records []*storage.VideoStatsRecord
 		for _, video := range videos {
 			records = append(records, &storage.VideoStatsRecord{
-				CreatedAt:    time.Now(),
-				Dt:           todayJST(),
-				ChannelID:    channelID,  // Use the channelID from the loop
-				VideoID:      video.ID,
-				Title:        video.Title,
-				ChannelName:  video.ChannelName, // Add this field
-				Tags:         video.Tags,        // Add this field
-				IsShort:      video.IsShort,     // Add this field
-				Views:        int64(video.Views),
-				Likes:        int64(video.Likes),
-				Comments:     int64(video.Comments),
-				PublishedAt:  video.PublishedAt,
+				CreatedAt:      time.Now(),
+				Dt:             todayJST(),
+				ChannelID:      channelID,
+				VideoID:        video.ID,
+				Title:          video.Title,
+				ChannelName:    video.ChannelName,
+				Tags:           video.Tags,
+				IsShort:        video.IsShort,
+				Views:          int64(video.Views),
+				Likes:          int64(video.Likes),
+				Comments:       int64(video.Comments),
+				PublishedAt:    video.PublishedAt,
+				DurationSec:    video.DurationSec,
+				ContentDetails: video.ContentDetails,
+				TopicDetails:   video.TopicDetails,
 			})
 		}
 

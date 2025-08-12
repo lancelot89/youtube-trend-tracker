@@ -25,18 +25,21 @@ type BigQueryWriter struct {
 
 // VideoStatsRecord represents a record to be inserted into BigQuery.
 type VideoStatsRecord struct {
-	Dt           civil.Date `bigquery:"dt"`
-	ChannelID    string     `bigquery:"channel_id"`
-	VideoID      string     `bigquery:"video_id"`
-	Title        string     `bigquery:"title"`
-	ChannelName  string     `bigquery:"channel_name"`
-	Tags         []string   `bigquery:"tags"`
-	IsShort      bool       `bigquery:"is_short"`
-	Views        int64      `bigquery:"views"`
-	Likes        int64      `bigquery:"likes"`
-	Comments     int64      `bigquery:"comments"`
-	PublishedAt  time.Time  `bigquery:"published_at"`
-	CreatedAt    time.Time  `bigquery:"created_at"`
+	Dt             civil.Date `bigquery:"dt"`
+	ChannelID      string     `bigquery:"channel_id"`
+	VideoID        string     `bigquery:"video_id"`
+	Title          string     `bigquery:"title"`
+	ChannelName    string     `bigquery:"channel_name"`
+	Tags           []string   `bigquery:"tags"`
+	IsShort        bool       `bigquery:"is_short"`
+	Views          int64      `bigquery:"views"`
+	Likes          int64      `bigquery:"likes"`
+	Comments       int64      `bigquery:"comments"`
+	PublishedAt    time.Time  `bigquery:"published_at"`
+	CreatedAt      time.Time  `bigquery:"created_at"`
+	DurationSec    int64      `bigquery:"duration_sec"`
+	ContentDetails string     `bigquery:"content_details"`
+	TopicDetails   []string   `bigquery:"topic_details"`
 }
 
 // EnsureTableExists checks if the dataset and table exist, and creates them if they don't.
@@ -86,18 +89,21 @@ func getSchemaJSON() []byte {
 	// In a real application, you would load this from a file.
 	// For simplicity here, it's embedded.
 	return []byte(`[
-	  {"name": "dt",           "type": "DATE",      "mode": "REQUIRED"},
-	  {"name": "channel_id",   "type": "STRING",    "mode": "REQUIRED"},
-	  {"name": "video_id",     "type": "STRING",    "mode": "REQUIRED"},
-	  {"name": "title",        "type": "STRING",    "mode": "NULLABLE"},
-	  {"name": "channel_name", "type": "STRING",    "mode": "NULLABLE"},
-	  {"name": "tags",         "type": "STRING",    "mode": "REPEATED"},
-	  {"name": "is_short",     "type": "BOOLEAN",   "mode": "NULLABLE"},
-	  {"name": "views",        "type": "INTEGER",   "mode": "NULLABLE"},
-	  {"name": "likes",        "type": "INTEGER",   "mode": "NULLABLE"},
-	  {"name": "comments",     "type": "INTEGER",   "mode": "NULLABLE"},
-	  {"name": "published_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
-	  {"name": "created_at",   "type": "TIMESTAMP", "mode": "REQUIRED"}
+	  {"name": "dt",               "type": "DATE",      "mode": "REQUIRED"},
+	  {"name": "channel_id",       "type": "STRING",    "mode": "REQUIRED"},
+	  {"name": "video_id",         "type": "STRING",    "mode": "REQUIRED"},
+	  {"name": "title",            "type": "STRING",    "mode": "NULLABLE"},
+	  {"name": "channel_name",     "type": "STRING",    "mode": "NULLABLE"},
+	  {"name": "tags",             "type": "STRING",    "mode": "REPEATED"},
+	  {"name": "is_short",         "type": "BOOLEAN",   "mode": "NULLABLE"},
+	  {"name": "views",            "type": "INTEGER",   "mode": "NULLABLE"},
+	  {"name": "likes",            "type": "INTEGER",   "mode": "NULLABLE"},
+	  {"name": "comments",         "type": "INTEGER",   "mode": "NULLABLE"},
+	  {"name": "published_at",     "type": "TIMESTAMP", "mode": "NULLABLE"},
+	  {"name": "created_at",       "type": "TIMESTAMP", "mode": "REQUIRED"},
+	  {"name": "duration_sec",     "type": "INTEGER",   "mode": "NULLABLE"},
+	  {"name": "content_details",  "type": "STRING",    "mode": "NULLABLE"},
+	  {"name": "topic_details",    "type": "STRING",    "mode": "REPEATED"}
 	]`)
 }
 
@@ -105,11 +111,9 @@ func getSchemaJSON() []byte {
 func NewBigQueryWriter(ctx context.Context, projectID string) (*BigQueryWriter, error) {
 	var opts []option.ClientOption
 	if host := os.Getenv("BIGQUERY_EMULATOR_HOST"); host != "" {
-		// The BigQuery emulator requires a specific endpoint format.
-		// Note: The goccy/bigquery-emulator uses gRPC by default on port 9060.
-		// The endpoint needs to be set without the http/https scheme.
-		opts = append(opts, option.WithEndpoint("http://"+host))
-		// For emulators, we often don't need actual authentication.
+		// For connecting to the emulator's HTTP endpoint
+		endpoint := "http://" + host // Use HTTP for the REST API
+		opts = append(opts, option.WithEndpoint(endpoint))
 		opts = append(opts, option.WithoutAuthentication())
 	}
 

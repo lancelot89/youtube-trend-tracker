@@ -3,6 +3,7 @@ module github.com/lancelop89/youtube-trend-tracker
 go 1.24.6
 
 require (
+	cloud.google.com/go v0.121.0
 	cloud.google.com/go/bigquery v1.69.0
 	github.com/joho/godotenv v1.5.1
 	google.golang.org/api v0.246.0
@@ -10,7 +11,6 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.121.0 // indirect
 	cloud.google.com/go/auth v0.16.3 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect

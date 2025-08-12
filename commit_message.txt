@@ -1,0 +1,17 @@
+feat: Add duration, content details, and topic details to video data
+
+This commit extends the video data fetching and storage capabilities to include:
+- Video duration in seconds (`duration_sec`)
+- Content details as JSON string (`content_details`)
+- Topic details as string array (`topic_details`)
+
+Key changes include:
+- Modified `internal/youtube/client.go` to fetch new fields and parse duration.
+- Updated `internal/storage/bq.go` to reflect new schema and handle emulator connection.
+- Adjusted `internal/fetcher/fetcher.go` to map new fields.
+- Refactored `cmd/fetcher/main.go` for flexible local execution.
+- Updated `Refactoring.md` with the latest project plan.
+- Added `work_log_20250812.md` to document the implementation and verification process.
+
+The BigQuery schema has been updated to accommodate these new fields.
+Verification was performed against a BigQuery emulator, confirming successful data ingestion and field population.
