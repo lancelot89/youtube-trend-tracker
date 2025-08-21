@@ -1,0 +1,27 @@
+version: "3.8"
+services:
+  bq-emulator:
+    image: ghcr.io/goccy/bigquery-emulator:0.4.2
+    platform: linux/amd64
+    command: --project=test-project
+    volumes:
+      - ./deployments/bq:/testdata
+    ports:
+      - "9050:9050" # HTTP
+      - "9060:9060" # gRPC
+
+  fetcher:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      GO_ENV: local
+      GOOGLE_CLOUD_PROJECT: test-project
+      CHANNEL_CONFIG_PATH: /app/configs/channels.yaml
+      BIGQUERY_EMULATOR_HOST: bq-emulator:9050
+      MAX_VIDEOS_PER_CHANNEL: "200"
+    volumes:
+      - ./configs:/app/configs
+      - ./.env:/srv/.env
+    depends_on:
+      - bq-emulator

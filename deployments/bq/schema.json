@@ -1,0 +1,14 @@
+[
+  {"name": "dt",           "type": "DATE",      "mode": "REQUIRED"},
+  {"name": "channel_id",   "type": "STRING",    "mode": "REQUIRED"},
+  {"name": "video_id",     "type": "STRING",    "mode": "REQUIRED"},
+  {"name": "title",        "type": "STRING",    "mode": "NULLABLE"},
+  {"name": "channel_name", "type": "STRING",    "mode": "NULLABLE"},
+  {"name": "tags",         "type": "STRING",    "mode": "REPEATED"},
+  {"name": "is_short",     "type": "BOOLEAN",   "mode": "NULLABLE"},
+  {"name": "views",        "type": "INTEGER",   "mode": "NULLABLE"},
+  {"name": "likes",        "type": "INTEGER",   "mode": "NULLABLE"},
+  {"name": "comments",     "type": "INTEGER",   "mode": "NULLABLE"},
+  {"name": "published_at", "type": "TIMESTAMP", "mode": "NULLABLE"},
+  {"name": "created_at",   "type": "TIMESTAMP", "mode": "REQUIRED"}
+]
