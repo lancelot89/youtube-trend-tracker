@@ -15,37 +15,37 @@ import (
 // Metrics holds all application metrics
 type Metrics struct {
 	// Counters
-	VideosProcessed   prometheus.Counter
-	APICallsTotal     *prometheus.CounterVec
-	BigQueryInserts   *prometheus.CounterVec
-	ErrorsTotal       *prometheus.CounterVec
-	
+	VideosProcessed prometheus.Counter
+	APICallsTotal   *prometheus.CounterVec
+	BigQueryInserts *prometheus.CounterVec
+	ErrorsTotal     *prometheus.CounterVec
+
 	// Histograms for latency
-	APICallDuration      *prometheus.HistogramVec
-	BigQueryDuration     *prometheus.HistogramVec
-	ProcessingDuration   prometheus.Histogram
-	
+	APICallDuration    *prometheus.HistogramVec
+	BigQueryDuration   *prometheus.HistogramVec
+	ProcessingDuration prometheus.Histogram
+
 	// Gauges
-	LastRunTimestamp     prometheus.Gauge
-	APIQuotaRemaining    prometheus.Gauge
-	ActiveConnections    prometheus.Gauge
-	
-	mu sync.RWMutex
+	LastRunTimestamp  prometheus.Gauge
+	APIQuotaRemaining prometheus.Gauge
+	ActiveConnections prometheus.Gauge
+
+	mu       sync.RWMutex
 	registry *prometheus.Registry
 }
 
 // NewMetrics creates and registers all metrics
 func NewMetrics() *Metrics {
 	registry := prometheus.NewRegistry()
-	
+
 	m := &Metrics{
 		registry: registry,
-		
+
 		VideosProcessed: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "ytt_videos_processed_total",
 			Help: "Total number of videos processed",
 		}),
-		
+
 		APICallsTotal: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "ytt_api_calls_total",
@@ -53,7 +53,7 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"api", "method", "status"},
 		),
-		
+
 		BigQueryInserts: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "ytt_bigquery_inserts_total",
@@ -61,7 +61,7 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"dataset", "table", "status"},
 		),
-		
+
 		ErrorsTotal: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "ytt_errors_total",
@@ -69,7 +69,7 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"component", "type"},
 		),
-		
+
 		APICallDuration: prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
 				Name:    "ytt_api_call_duration_seconds",
@@ -78,7 +78,7 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"api", "method"},
 		),
-		
+
 		BigQueryDuration: prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
 				Name:    "ytt_bigquery_operation_duration_seconds",
@@ -87,7 +87,7 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"operation", "dataset", "table"},
 		),
-		
+
 		ProcessingDuration: prometheus.NewHistogram(
 			prometheus.HistogramOpts{
 				Name:    "ytt_processing_duration_seconds",
@@ -95,21 +95,21 @@ func NewMetrics() *Metrics {
 				Buckets: prometheus.ExponentialBuckets(1, 2, 10),
 			},
 		),
-		
+
 		LastRunTimestamp: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "ytt_last_run_timestamp",
 				Help: "Timestamp of the last successful run",
 			},
 		),
-		
+
 		APIQuotaRemaining: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "ytt_api_quota_remaining",
 				Help: "Remaining API quota",
 			},
 		),
-		
+
 		ActiveConnections: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "ytt_active_connections",
@@ -117,7 +117,7 @@ func NewMetrics() *Metrics {
 			},
 		),
 	}
-	
+
 	// Register all metrics
 	registry.MustRegister(
 		m.VideosProcessed,
@@ -131,11 +131,11 @@ func NewMetrics() *Metrics {
 		m.APIQuotaRemaining,
 		m.ActiveConnections,
 	)
-	
+
 	// Register default Go metrics
 	registry.MustRegister(prometheus.NewGoCollector())
 	registry.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	
+
 	return m
 }
 
@@ -201,12 +201,12 @@ func StartMetricsServer(ctx context.Context, port int, metrics *Metrics) error {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "OK")
 	})
-	
+
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
 		Handler: mux,
 	}
-	
+
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -215,11 +215,11 @@ func StartMetricsServer(ctx context.Context, port int, metrics *Metrics) error {
 			slog.Error("Failed to shutdown metrics server", "error", err)
 		}
 	}()
-	
+
 	slog.Info("Starting metrics server", "port", port)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("metrics server error: %w", err)
 	}
-	
+
 	return nil
 }
