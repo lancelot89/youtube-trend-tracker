@@ -119,7 +119,6 @@ docker-run:
 	docker run --rm -p 8080:8080 \
 		-e GOOGLE_CLOUD_PROJECT=$(PROJECT_ID) \
 		-e YOUTUBE_API_KEY=$(YOUTUBE_API_KEY) \
-		-e CHANNEL_CONFIG_PATH=/srv/channels.yaml \
 		-e MAX_VIDEOS_PER_CHANNEL=200 \
 		$(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(AR_REPO)/$(SERVICE_NAME):$(IMAGE_TAG)
 

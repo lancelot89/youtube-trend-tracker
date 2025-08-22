@@ -17,7 +17,6 @@ services:
     environment:
       GO_ENV: local
       GOOGLE_CLOUD_PROJECT: test-project
-      CHANNEL_CONFIG_PATH: /app/configs/channels.yaml
       BIGQUERY_EMULATOR_HOST: bq-emulator:9050
       MAX_VIDEOS_PER_CHANNEL: "200"
     volumes:
