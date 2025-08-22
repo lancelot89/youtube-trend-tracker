@@ -14,7 +14,7 @@ fi
 if gcloud secrets describe "$SECRET_NAME" --project="$PROJECT_ID" >/dev/null 2>&1; then
     echo "Secret '$SECRET_NAME' already exists. Skipping creation."
 else
-    echo "Creating secret '$SECRET_NAME'...
+    echo "Creating secret '$SECRET_NAME'..."
     echo -n "$YOUTUBE_API_KEY" | gcloud secrets create "$SECRET_NAME" \
         --project="$PROJECT_ID" \
         --replication-policy="automatic" \
