@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -51,6 +52,23 @@ func logJSON(level, msg string, err error, labels map[string]string) {
 
 func isLocal() bool {
 	return os.Getenv("GO_ENV") == "local"
+}
+
+// isValidAPIKey performs basic validation on the YouTube API key format
+func isValidAPIKey(apiKey string) bool {
+	// YouTube API keys are typically 39 characters long and contain alphanumeric chars with dashes/underscores
+	// This is a basic check - the actual validation happens when calling the API
+	apiKey = strings.TrimSpace(apiKey)
+	if len(apiKey) < 30 || len(apiKey) > 50 {
+		return false
+	}
+	// Check for obviously invalid patterns
+	if strings.Contains(apiKey, " ") || strings.Contains(apiKey, "\n") || strings.Contains(apiKey, "\t") {
+		return false
+	}
+	// Basic pattern check (alphanumeric with dashes and underscores)
+	matched, _ := regexp.MatchString(`^[A-Za-z0-9_-]+$`, apiKey)
+	return matched
 }
 
 func getProjectID() (string, error) {
@@ -128,6 +146,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate API key format (basic check)
+	if !isValidAPIKey(apiKey) {
+		logJSON("error", "Invalid YouTube API key format", nil, nil)
+		http.Error(w, "Invalid API key configuration", http.StatusInternalServerError)
+		return
+	}
+
 	maxVideosPerChannel, err := strconv.ParseInt(maxVideosPerChannelStr, 10, 64)
 	if err != nil || maxVideosPerChannel <= 0 {
 		logJSON("warning", fmt.Sprintf("Invalid MAX_VIDEOS_PER_CHANNEL: %s. Using default 10.", maxVideosPerChannelStr), err, nil)
@@ -135,7 +160,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read channel config from file
-	channelConfigBytes, err := ioutil.ReadFile(channelConfigPath)
+	channelConfigBytes, err := os.ReadFile(channelConfigPath)
 	if err != nil {
 		logJSON("error", "Error reading channel config file", err, nil)
 		http.Error(w, "Invalid channel configuration file", http.StatusInternalServerError)
