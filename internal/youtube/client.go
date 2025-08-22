@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lancelop89/youtube-trend-tracker/internal/errors"
+	"github.com/lancelop89/youtube-trend-tracker/internal/retry"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 	yt "google.golang.org/api/youtube/v3"
@@ -66,22 +68,25 @@ func (c *Client) FetchChannelVideos(ctx context.Context, channelID string, maxRe
 		if nextPageToken != "" {
 			itCall = itCall.PageToken(nextPageToken)
 		}
+		
 		var itResp *yt.PlaylistItemListResponse
-		var err error
-		for i := 0; i < 5; i++ { // Max 5 retries
-			itResp, err = itCall.Do()
-			if err == nil {
-				break
+		err := retry.Do(func() error {
+			var apiErr error
+			itResp, apiErr = itCall.Do()
+			if apiErr != nil {
+				if e, ok := apiErr.(*googleapi.Error); ok {
+					if e.Code == 429 || (e.Code >= 500 && e.Code < 600) {
+						return errors.Temporary("YouTube API temporary error", apiErr)
+					}
+					return errors.API("YouTube API error", apiErr)
+				}
+				return apiErr
 			}
-			if e, ok := err.(*googleapi.Error); ok && (e.Code == 429 || (e.Code >= 500 && e.Code < 600)) {
-				sleepTime := time.Duration(1<<uint(i)) * time.Second // Exponential backoff
-				time.Sleep(sleepTime)
-				continue
-			}
-			return nil, fmt.Errorf("playlistItems.list: %w", err) // Non-retriable error
-		}
+			return nil
+		}, retry.DefaultConfig())
+		
 		if err != nil {
-			return nil, fmt.Errorf("playlistItems.list: %w", err) // All retries failed
+			return nil, fmt.Errorf("playlistItems.list: %w", err)
 		}
 
 		for _, it := range itResp.Items {
@@ -107,21 +112,23 @@ func (c *Client) FetchChannelVideos(ctx context.Context, channelID string, maxRe
 		batchIDs := allVideoIDs[i:end]
 
 		var vResp *yt.VideoListResponse
-		var err error
-		for i := 0; i < 5; i++ { // Max 5 retries
-			vResp, err = c.service.Videos.List([]string{"snippet", "statistics", "contentDetails", "topicDetails"}).Id(batchIDs...).Do()
-			if err == nil {
-				break
+		err := retry.Do(func() error {
+			var apiErr error
+			vResp, apiErr = c.service.Videos.List([]string{"snippet", "statistics", "contentDetails", "topicDetails"}).Id(batchIDs...).Do()
+			if apiErr != nil {
+				if e, ok := apiErr.(*googleapi.Error); ok {
+					if e.Code == 429 || (e.Code >= 500 && e.Code < 600) {
+						return errors.Temporary("YouTube API temporary error", apiErr)
+					}
+					return errors.API("YouTube API error", apiErr)
+				}
+				return apiErr
 			}
-			if e, ok := err.(*googleapi.Error); ok && (e.Code == 429 || (e.Code >= 500 && e.Code < 600)) {
-				sleepTime := time.Duration(1<<uint(i)) * time.Second // Exponential backoff
-				time.Sleep(sleepTime)
-				continue
-			}
-			return nil, fmt.Errorf("videos.list: %w", err) // Non-retriable error
-		}
+			return nil
+		}, retry.DefaultConfig())
+		
 		if err != nil {
-			return nil, fmt.Errorf("videos.list: %w", err) // All retries failed
+			return nil, fmt.Errorf("videos.list: %w", err)
 		}
 
 		for _, item := range vResp.Items {
