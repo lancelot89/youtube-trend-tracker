@@ -1,7 +1,7 @@
 #!/bin/bash
-set -eu
+set -euo pipefail
 
-if [ -z "$4" ]; then
+if [ $# -lt 4 ]; then
   echo "Usage: $0 <project_id> <region> <repo_name> <service_name>"
   exit 1
 fi
