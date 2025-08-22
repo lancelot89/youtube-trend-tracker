@@ -20,6 +20,9 @@ gcloud config set project "$PROJECT_ID" >/dev/null
 # APIs
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com bigquery.googleapis.com >/dev/null
 
+# Authenticate Docker to Artifact Registry
+gcloud auth configure-docker "${REGION}-docker.pkg.dev" --project="$PROJECT_ID"
+
 # Artifact Registry repo（なければ作成）
 gcloud artifacts repositories describe "$AR_REPO" --location="$REGION" >/dev/null 2>&1 || \
   gcloud artifacts repositories create "$AR_REPO" --repository-format=docker --location="$REGION"
