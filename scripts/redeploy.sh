@@ -38,7 +38,12 @@ gcloud run deploy "$SERVICE" \
   --service-account "$SERVICE_ACCOUNT" \
   --set-secrets YOUTUBE_API_KEY=youtube-api-key:latest \
   --set-env-vars GOOGLE_CLOUD_PROJECT="${PROJECT_ID}",MAX_VIDEOS_PER_CHANNEL=200 \
-  --no-allow-unauthenticated
+  --no-allow-unauthenticated \
+  --port 8080 \
+  --memory 512Mi \
+  --cpu 1 \
+  --max-instances 10 \
+  --timeout 300
 
 echo -e "\n✅ Redeployment complete!"
 

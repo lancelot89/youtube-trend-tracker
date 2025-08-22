@@ -8,6 +8,8 @@ spec:
       serviceAccountName: trend-tracker-sa@${PROJECT_ID}.iam.gserviceaccount.com
       containers:
       - image: ${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_NAME}:${TAG}
+        ports:
+        - containerPort: 8080
         env:
         - name: GOOGLE_CLOUD_PROJECT
           value: ${PROJECT_ID}
@@ -18,3 +20,19 @@ spec:
             secretKeyRef:
               name: youtube-api-key
               key: latest
+        resources:
+          limits:
+            cpu: "1"
+            memory: "512Mi"
+          requests:
+            cpu: "0.5"
+            memory: "256Mi"
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 3

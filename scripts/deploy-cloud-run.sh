@@ -44,8 +44,13 @@ gcloud run deploy "$SERVICE" \
   --region "$REGION" \
   --service-account "$SERVICE_ACCOUNT" \
   --set-secrets YOUTUBE_API_KEY=youtube-api-key:latest \
-  --set-env-vars GOOGLE_CLOUD_PROJECT="${PROJECT_ID}" \
-  --no-allow-unauthenticated
+  --set-env-vars GOOGLE_CLOUD_PROJECT="${PROJECT_ID}",MAX_VIDEOS_PER_CHANNEL=200 \
+  --no-allow-unauthenticated \
+  --port 8080 \
+  --memory 512Mi \
+  --cpu 1 \
+  --max-instances 10 \
+  --timeout 300
 
 # URL 確認
 SERVICE_URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')

@@ -18,6 +18,6 @@ FROM gcr.io/distroless/base-debian12
 USER nonroot:nonroot
 WORKDIR /srv
 COPY --from=builder /app/fetcher /srv/fetcher
-COPY configs/config.yaml /srv/config.yaml
+COPY configs/config.yaml /srv/configs/config.yaml
 EXPOSE 8080
 ENTRYPOINT ["/srv/fetcher"]
