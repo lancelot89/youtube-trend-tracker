@@ -130,7 +130,7 @@ docker-run:
 ## deploy: Deploy to Cloud Run
 deploy: docker-build docker-push
 	@echo "$(GREEN)Deploying to Cloud Run...$(NC)"
-	./scripts/deploy-cloud-run.sh $(PROJECT_ID) $(REGION) $(SERVICE_NAME) $(AR_REPO)
+	./scripts/deploy-cloud-run.sh $(PROJECT_ID) $(REGION) $(AR_REPO) $(SERVICE_NAME)
 
 ## redeploy: Rebuild and redeploy
 redeploy:
@@ -153,7 +153,7 @@ setup: env-check
 	@echo "Step 6/8: Building and pushing image..."
 	./scripts/build-and-push.sh $(PROJECT_ID) $(REGION) $(AR_REPO) $(SERVICE_NAME)
 	@echo "Step 7/8: Deploying Cloud Run service..."
-	./scripts/deploy-cloud-run.sh $(PROJECT_ID) $(REGION) $(SERVICE_NAME) $(AR_REPO)
+	./scripts/deploy-cloud-run.sh $(PROJECT_ID) $(REGION) $(AR_REPO) $(SERVICE_NAME)
 	@echo "Step 8/8: Creating Cloud Scheduler job..."
 	./scripts/create-scheduler.sh $(PROJECT_ID) $(REGION) $(SERVICE_NAME)
 	@echo "$(GREEN)Setup complete!$(NC)"
