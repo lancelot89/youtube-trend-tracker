@@ -1,3 +1,6 @@
+// Package metrics provides Prometheus metrics for the YouTube Trend Tracker application.
+// This package will be integrated in a future update for monitoring and observability.
+// TODO: Integrate with main application in Issue #28
 package metrics
 
 import (

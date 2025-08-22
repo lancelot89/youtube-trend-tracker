@@ -1,45 +1,45 @@
 package fetcher
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/civil"
-	"github.com/lancelop89/youtube-trend-tracker/internal/storage"
-	"github.com/lancelop89/youtube-trend-tracker/internal/youtube"
 )
 
-// Mock YouTube Client
-type mockYouTubeClient struct {
-	videos []*youtube.Video
-	err    error
-}
+// Mock implementations are commented out until dependency injection is refactored
+// These will be needed when Fetcher is updated to accept interfaces
 
-func (m *mockYouTubeClient) FetchChannelVideos(ctx context.Context, channelID string, maxResults int64) ([]*youtube.Video, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return m.videos, nil
-}
+// // Mock YouTube Client
+// type mockYouTubeClient struct {
+// 	videos []*youtube.Video
+// 	err    error
+// }
 
-// Mock BigQuery Writer
-type mockBigQueryWriter struct {
-	insertedRecords []*storage.VideoStatsRecord
-	err             error
-}
+// func (m *mockYouTubeClient) FetchChannelVideos(ctx context.Context, channelID string, maxResults int64) ([]*youtube.Video, error) {
+// 	if m.err != nil {
+// 		return nil, m.err
+// 	}
+// 	return m.videos, nil
+// }
 
-func (m *mockBigQueryWriter) InsertVideoStats(ctx context.Context, records []*storage.VideoStatsRecord) error {
-	if m.err != nil {
-		return m.err
-	}
-	m.insertedRecords = append(m.insertedRecords, records...)
-	return nil
-}
+// // Mock BigQuery Writer
+// type mockBigQueryWriter struct {
+// 	insertedRecords []*storage.VideoStatsRecord
+// 	err             error
+// }
 
-func (m *mockBigQueryWriter) EnsureTableExists(ctx context.Context) error {
-	return nil
-}
+// func (m *mockBigQueryWriter) InsertVideoStats(ctx context.Context, records []*storage.VideoStatsRecord) error {
+// 	if m.err != nil {
+// 		return m.err
+// 	}
+// 	m.insertedRecords = append(m.insertedRecords, records...)
+// 	return nil
+// }
+
+// func (m *mockBigQueryWriter) EnsureTableExists(ctx context.Context) error {
+// 	return nil
+// }
 
 func TestFetchAndStore_Success(t *testing.T) {
 	// This test demonstrates the need for dependency injection
