@@ -1,0 +1,63 @@
+# Dependabot configuration for automated dependency updates
+version: 2
+updates:
+  # Go modules
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    pull-request-branch-name:
+      separator: "/"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    reviewers:
+      - "lancelot89"
+    labels:
+      - "dependencies"
+      - "go"
+    groups:
+      google-cloud:
+        patterns:
+          - "cloud.google.com/*"
+          - "google.golang.org/*"
+      
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    reviewers:
+      - "lancelot89"
+    labels:
+      - "dependencies"
+      - "ci"
+      
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    reviewers:
+      - "lancelot89"
+    labels:
+      - "dependencies"
+      - "docker"
