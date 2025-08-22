@@ -7,7 +7,7 @@ spec:
     spec:
       serviceAccountName: trend-tracker-sa@${PROJECT_ID}.iam.gserviceaccount.com
       containers:
-      - image: ${REGION}-docker.pkg.dev/${PROJECT_ID}/trend-tracker-repo/fetcher:${TAG}
+      - image: ${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_NAME}:${TAG}
         env:
         - name: GOOGLE_CLOUD_PROJECT
           value: ${PROJECT_ID}

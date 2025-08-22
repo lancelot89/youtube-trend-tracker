@@ -237,10 +237,17 @@ go run ./cmd/fetcher/main.go --once --debug
 
 ## 設定ファイル
 
-本プロジェクトでは、設定を YAML ファイルで管理しています。
+本プロジェクトでは、設定を以下のファイルで管理しています：
 
-- `configs/project.yaml`: プロジェクト全体のメタデータ（モジュール構成、利用する Secret 名など）を定義します。
-- `configs/channels.yaml`: トレンドを監視したい YouTube チャンネルの ID をリスト形式で指定します。
+### 環境変数
+- `.env.example`: 環境変数のテンプレート
+- `.env`: 実際の環境変数（`.env.example`をコピーして作成）
+
+詳細は [`docs/ENVIRONMENT_VARIABLES.md`](docs/ENVIRONMENT_VARIABLES.md) を参照してください。
+
+### YAML設定
+- `configs/project.yaml`: プロジェクト全体のメタデータ（モジュール構成、利用する Secret 名など）
+- `configs/channels.yaml`: トレンドを監視したい YouTube チャンネルの ID リスト
 
 ---
 
