@@ -70,9 +70,9 @@ func TestAppErrorWithContext(t *testing.T) {
 		"channel_id": "ABC123",
 		"attempt":    3,
 	}
-	
+
 	err := NewWithContext(ErrTypeAPI, "API failed", nil, context)
-	
+
 	if err.Context["channel_id"] != "ABC123" {
 		t.Errorf("Context channel_id = %v, want ABC123", err.Context["channel_id"])
 	}
@@ -84,7 +84,7 @@ func TestAppErrorWithContext(t *testing.T) {
 func TestIsAppError(t *testing.T) {
 	appErr := Config("test", nil)
 	regularErr := fmt.Errorf("regular error")
-	
+
 	if !IsAppError(appErr) {
 		t.Error("IsAppError() should return true for AppError")
 	}
@@ -96,7 +96,7 @@ func TestIsAppError(t *testing.T) {
 func TestGetType(t *testing.T) {
 	appErr := API("test", nil)
 	regularErr := fmt.Errorf("regular error")
-	
+
 	if errType, ok := GetType(appErr); !ok || errType != ErrTypeAPI {
 		t.Errorf("GetType() = %v, %v, want %v, true", errType, ok, ErrTypeAPI)
 	}
@@ -108,7 +108,7 @@ func TestGetType(t *testing.T) {
 func TestUnwrap(t *testing.T) {
 	underlyingErr := fmt.Errorf("underlying error")
 	appErr := API("wrapper", underlyingErr)
-	
+
 	if appErr.Unwrap() != underlyingErr {
 		t.Errorf("Unwrap() = %v, want %v", appErr.Unwrap(), underlyingErr)
 	}
