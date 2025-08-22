@@ -1,1 +1,94 @@
+# Environment variables
 .env
+.env.local
+.env.*.local
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/fetcher
+/cmd/fetcher/fetcher
+youtube-trend-tracker
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+*.prof
+*.cover
+*.html
+coverage.txt
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Build directories
+/dist/
+/build/
+/bin/
+/tmp/
+
+# Docker
+.dockerignore.local
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+/logs
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+*.cache
+temp/
+
+# Local data
+/data/
+*.db
+*.sqlite
+
+# Terraform (if used in future)
+*.tfstate
+*.tfstate.*
+.terraform/
+terraform.tfvars
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+.Trash-*
+
+# Project specific
+/secrets/
+*.key
+*.pem
+*.cert
+*.crt
