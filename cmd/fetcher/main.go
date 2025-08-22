@@ -3,92 +3,84 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
-	"regexp"
+	"os/signal"
 	"runtime"
-	"strconv"
-	"strings"
+	"syscall"
 
-	"github.com/joho/godotenv"
+	"github.com/lancelop89/youtube-trend-tracker/internal/config"
 	"github.com/lancelop89/youtube-trend-tracker/internal/fetcher"
 	"github.com/lancelop89/youtube-trend-tracker/internal/logger"
 	"github.com/lancelop89/youtube-trend-tracker/internal/storage"
 	"github.com/lancelop89/youtube-trend-tracker/internal/youtube"
-	"gopkg.in/yaml.v2"
 )
 
-// Config defines the structure for channel configuration.
-type Config struct {
-	Channels []struct {
-		ID string `yaml:"id"`
-	} `yaml:"channels"`
-}
-
-// Backward compatibility - will be removed in future
-var log = logger.New()
-
-// logJSON is deprecated, use logger.Logger methods instead
-func logJSON(level, msg string, err error, labels map[string]string) {
-	logger.LogJSON(level, msg, err, labels)
-}
-
-func isLocal() bool {
-	return os.Getenv("GO_ENV") == "local"
-}
-
-// isValidAPIKey performs basic validation on the YouTube API key format
-func isValidAPIKey(apiKey string) bool {
-	// YouTube API keys are typically 39 characters long and contain alphanumeric chars with dashes/underscores
-	// This is a basic check - the actual validation happens when calling the API
-	apiKey = strings.TrimSpace(apiKey)
-	if len(apiKey) < 30 || len(apiKey) > 50 {
-		return false
-	}
-	// Check for obviously invalid patterns
-	if strings.Contains(apiKey, " ") || strings.Contains(apiKey, "\n") || strings.Contains(apiKey, "\t") {
-		return false
-	}
-	// Basic pattern check (alphanumeric with dashes and underscores)
-	matched, _ := regexp.MatchString(`^[A-Za-z0-9_-]+$`, apiKey)
-	return matched
-}
-
-func getProjectID() (string, error) {
-	if v := os.Getenv("PROJECT_ID"); v != "" {
-		return v, nil
-	}
-	if v := os.Getenv("GOOGLE_CLOUD_PROJECT"); v != "" {
-		return v, nil
-	}
-	// if metadata.OnGCE() {
-	// 	return metadata.ProjectID()
-	// }
-	return "", fmt.Errorf("project ID not found")
-}
+// Global configuration
+var (
+	cfg *config.Config
+	log = logger.New()
+)
 
 func main() {
-	if isLocal() {
-		err := godotenv.Load()
-		if err != nil {
-			log.Warning("Error loading .env file", err, nil)
-		}
+	// Parse command line flags
+	configPath := flag.String("config", "configs/config.yaml", "Path to configuration file")
+	flag.Parse()
+
+	// Load configuration
+	var err error
+	cfg, err = config.Load(*configPath)
+	if err != nil {
+		log.Fatal("Failed to load configuration", err, nil)
 	}
 
+	// Update logger based on configuration
+	log = logger.New()
+
+	// Setup HTTP handlers
 	http.HandleFunc("/", handler)
 	http.HandleFunc("/healthz", healthzHandler)
 	http.HandleFunc("/info", infoHandler)
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	// Create HTTP server
+	srv := &http.Server{
+		Addr:           ":" + cfg.Server.Port,
+		ReadTimeout:    cfg.Server.ReadTimeout,
+		WriteTimeout:   cfg.Server.WriteTimeout,
+		MaxHeaderBytes: cfg.Server.MaxHeaderBytes,
 	}
 
-	log.Info(fmt.Sprintf("Listening on port %s", port), nil)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	// Setup graceful shutdown
+	idleConnsClosed := make(chan struct{})
+	go func() {
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
+		<-sigint
+
+		log.Info("Shutting down server...", nil)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
+		defer cancel()
+
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Error("Server shutdown error", err, nil)
+		}
+		close(idleConnsClosed)
+	}()
+
+	// Start server
+	log.Info(fmt.Sprintf("Starting server on port %s", cfg.Server.Port), map[string]string{
+		"environment": cfg.App.Environment,
+		"project_id":  cfg.GCP.ProjectID,
+	})
+
+	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatal("Server failed to start", err, nil)
 	}
+
+	<-idleConnsClosed
+	log.Info("Server stopped", nil)
 }
 
 func healthzHandler(w http.ResponseWriter, r *http.Request) {
@@ -117,60 +109,23 @@ func infoHandler(w http.ResponseWriter, r *http.Request) {
 func handler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
-	// --- Configuration ---
-	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
-	apiKey := os.Getenv("YOUTUBE_API_KEY")
-	channelConfigPath := os.Getenv("CHANNEL_CONFIG_PATH")
-	maxVideosPerChannelStr := os.Getenv("MAX_VIDEOS_PER_CHANNEL")
-
-	if projectID == "" || apiKey == "" || channelConfigPath == "" {
-		log.Error("Missing required environment variables (PROJECT_ID, YOUTUBE_API_KEY, CHANNEL_CONFIG_PATH)", nil, nil)
-		http.Error(w, "Server configuration error", http.StatusInternalServerError)
+	// Get enabled channel IDs from configuration
+	channelIDs := cfg.GetEnabledChannelIDs()
+	if len(channelIDs) == 0 {
+		log.Error("No enabled channels in configuration", nil, nil)
+		http.Error(w, "No channels configured", http.StatusInternalServerError)
 		return
-	}
-
-	// Validate API key format (basic check)
-	if !isValidAPIKey(apiKey) {
-		log.Error("Invalid YouTube API key format", nil, nil)
-		http.Error(w, "Invalid API key configuration", http.StatusInternalServerError)
-		return
-	}
-
-	maxVideosPerChannel, err := strconv.ParseInt(maxVideosPerChannelStr, 10, 64)
-	if err != nil || maxVideosPerChannel <= 0 {
-		log.Warning(fmt.Sprintf("Invalid MAX_VIDEOS_PER_CHANNEL: %s. Using default 10.", maxVideosPerChannelStr), err, nil)
-		maxVideosPerChannel = 10 // Default value
-	}
-
-	// Read channel config from file
-	channelConfigBytes, err := os.ReadFile(channelConfigPath)
-	if err != nil {
-		log.Error("Error reading channel config file", err, nil)
-		http.Error(w, "Invalid channel configuration file", http.StatusInternalServerError)
-		return
-	}
-
-	var config Config
-	if err := yaml.Unmarshal(channelConfigBytes, &config); err != nil {
-		log.Error("Error parsing channel config", err, nil)
-		http.Error(w, "Invalid channel configuration", http.StatusBadRequest)
-		return
-	}
-
-	var channelIDs []string
-	for _, ch := range config.Channels {
-		channelIDs = append(channelIDs, ch.ID)
 	}
 
 	// --- Initialization ---
-	ytClient, err := youtube.NewClient(ctx, apiKey)
+	ytClient, err := youtube.NewClient(ctx, cfg.YouTube.APIKey)
 	if err != nil {
 		log.Error("Error creating YouTube client", err, nil)
 		http.Error(w, "Failed to create YouTube client", http.StatusInternalServerError)
 		return
 	}
 
-	bqWriter, err := storage.NewBigQueryWriter(ctx, projectID)
+	bqWriter, err := storage.NewBigQueryWriterWithConfig(ctx, cfg.GCP.ProjectID, cfg.BigQuery.DatasetID, cfg.BigQuery.TableID)
 	if err != nil {
 		log.Error("Error creating BigQuery writer", err, nil)
 		http.Error(w, "Failed to create BigQuery writer", http.StatusInternalServerError)
@@ -186,7 +141,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	// --- Execution ---
 	f := fetcher.NewFetcher(ytClient, bqWriter)
-	if err := f.FetchAndStore(ctx, channelIDs, maxVideosPerChannel); err != nil {
+	if err := f.FetchAndStore(ctx, channelIDs, cfg.App.MaxVideosPerChannel); err != nil {
 		log.Error("An error occurred during the fetch and store process", err, nil)
 		http.Error(w, "An error occurred during the fetch and store process", http.StatusInternalServerError)
 		return

@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/bigquery v1.69.0
 	github.com/joho/godotenv v1.5.1
 	google.golang.org/api v0.246.0
-	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

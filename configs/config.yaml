@@ -1,0 +1,73 @@
+# YouTube Trend Tracker Configuration
+# This is the main configuration file for the application
+
+# Application settings
+app:
+  environment: development
+  max_videos_per_channel: 200
+  fetch_timeout: 5m
+
+# YouTube API settings
+youtube:
+  # API key will be loaded from environment variable YOUTUBE_API_KEY
+  api_key: ""
+  quota_limit: 10000
+  request_timeout: 30s
+  max_retries: 5
+  retry_delay: 1s
+
+# Google Cloud Platform settings
+gcp:
+  # Project ID will be loaded from environment variable GOOGLE_CLOUD_PROJECT
+  project_id: ""
+  region: asia-northeast1
+  service_account: trend-tracker-sa
+
+# BigQuery settings
+bigquery:
+  dataset_id: youtube
+  table_id: video_trends
+  location: asia-northeast1
+  batch_size: 500
+  write_timeout: 30s
+
+# Server settings
+server:
+  port: "8080"
+  read_timeout: 10s
+  write_timeout: 10s
+  shutdown_timeout: 30s
+  max_header_bytes: 1048576
+
+# Logging settings
+logging:
+  level: info
+  format: json
+  output_path: stdout
+
+# YouTube channels to monitor
+channels:
+  - id: UCG_oqDSlIYEspNpd2H4zWhw
+    name: RehacQ
+    description: Business and technology insights
+    enabled: true
+    
+  - id: UC8yHePe_RgUBE-waRWy6olw
+    name: PIVOT
+    description: Business news and analysis
+    enabled: true
+    
+  - id: UCfTnJmRQP79C4y_BMF_XrlA
+    name: NewsPicks
+    description: Economic news platform
+    enabled: true
+    
+  - id: UCBvB2lvfRiuPG_0bKoo_Y5A
+    name: さとうさおり
+    description: Life and career advice
+    enabled: true
+    
+  - id: UCFo4kqllbcQ4nV83WCyraiw
+    name: YouTube大学
+    description: Educational content
+    enabled: true
