@@ -14,7 +14,7 @@ var log = logger.New()
 
 // Config holds retry configuration
 type Config struct {
-	MaxAttempts int
+	MaxAttempts  int
 	InitialDelay time.Duration
 	MaxDelay     time.Duration
 	Multiplier   float64
@@ -133,7 +133,7 @@ func CalculateBackoff(attempt int, config Config) time.Duration {
 	if attempt <= 0 {
 		return config.InitialDelay
 	}
-	
+
 	delay := config.InitialDelay * time.Duration(math.Pow(config.Multiplier, float64(attempt-1)))
 	if delay > config.MaxDelay {
 		return config.MaxDelay

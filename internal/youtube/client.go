@@ -68,7 +68,7 @@ func (c *Client) FetchChannelVideos(ctx context.Context, channelID string, maxRe
 		if nextPageToken != "" {
 			itCall = itCall.PageToken(nextPageToken)
 		}
-		
+
 		var itResp *yt.PlaylistItemListResponse
 		err := retry.Do(func() error {
 			var apiErr error
@@ -84,7 +84,7 @@ func (c *Client) FetchChannelVideos(ctx context.Context, channelID string, maxRe
 			}
 			return nil
 		}, retry.DefaultConfig())
-		
+
 		if err != nil {
 			return nil, fmt.Errorf("playlistItems.list: %w", err)
 		}
@@ -126,7 +126,7 @@ func (c *Client) FetchChannelVideos(ctx context.Context, channelID string, maxRe
 			}
 			return nil
 		}, retry.DefaultConfig())
-		
+
 		if err != nil {
 			return nil, fmt.Errorf("videos.list: %w", err)
 		}

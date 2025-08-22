@@ -168,11 +168,11 @@ func TestGetProjectID(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name                string
-		projectID           string
-		googleCloudProject  string
-		expectedID          string
-		expectError         bool
+		name               string
+		projectID          string
+		googleCloudProject string
+		expectedID         string
+		expectError        bool
 	}{
 		{
 			name:        "PROJECT_ID set",

@@ -38,7 +38,7 @@ func New() *Logger {
 	if levelStr == "" {
 		levelStr = "info"
 	}
-	
+
 	var minLevel LogLevel
 	switch levelStr {
 	case "debug":
@@ -52,7 +52,7 @@ func New() *Logger {
 	default:
 		minLevel = INFO
 	}
-	
+
 	return &Logger{
 		minLevel: minLevel,
 	}
@@ -67,7 +67,7 @@ func (l *Logger) shouldLog(level LogLevel) bool {
 		ERROR:   3,
 		FATAL:   4,
 	}
-	
+
 	return levels[level] >= levels[l.minLevel]
 }
 
@@ -76,18 +76,18 @@ func (l *Logger) log(level LogLevel, msg string, err error, labels map[string]st
 	if !l.shouldLog(level) {
 		return
 	}
-	
+
 	entry := Entry{
 		Timestamp: time.Now().Format(time.RFC3339),
 		Level:     string(level),
 		Message:   msg,
 		Labels:    labels,
 	}
-	
+
 	if err != nil {
 		entry.Error = err.Error()
 	}
-	
+
 	jsonBytes, _ := json.Marshal(entry)
 	fmt.Println(string(jsonBytes))
 }

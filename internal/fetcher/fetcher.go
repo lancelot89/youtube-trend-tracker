@@ -39,7 +39,7 @@ type FetchResult struct {
 // FetchAndStore fetches video statistics from YouTube and stores them in BigQuery.
 func (f *Fetcher) FetchAndStore(ctx context.Context, channelIDs []string, maxVideosPerChannel int64) error {
 	log.Info("Starting fetch and store process...", nil)
-	
+
 	result := &FetchResult{
 		SuccessfulChannels: make([]string, 0),
 		FailedChannels:     make(map[string]error),
@@ -84,7 +84,7 @@ func (f *Fetcher) FetchAndStore(ctx context.Context, channelIDs []string, maxVid
 			result.FailedChannels[channelID] = appErr
 			continue
 		}
-		
+
 		result.SuccessfulChannels = append(result.SuccessfulChannels, channelID)
 		result.TotalVideos += len(records)
 		log.Info(fmt.Sprintf("Successfully stored %d records for channel %s", len(records), channelID), map[string]string{"channel_id": channelID})
@@ -98,12 +98,12 @@ func (f *Fetcher) FetchAndStore(ctx context.Context, channelIDs []string, maxVid
 			"failed_channels":     fmt.Sprintf("%d", len(result.FailedChannels)),
 			"total_videos":        fmt.Sprintf("%d", result.TotalVideos),
 		})
-	
+
 	// Return error if all channels failed
 	if len(result.FailedChannels) == len(channelIDs) {
 		return errors.New(errors.ErrTypeAPI, "All channels failed to process", nil)
 	}
-	
+
 	return nil
 }
 

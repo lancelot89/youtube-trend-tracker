@@ -45,7 +45,7 @@ func TestFetchAndStore_Success(t *testing.T) {
 	// This test demonstrates the need for dependency injection
 	// Currently, the Fetcher is tightly coupled with concrete implementations
 	// Making it difficult to unit test without actual YouTube/BigQuery connections
-	
+
 	// TODO: Refactor Fetcher to accept interfaces instead of concrete types
 	// This would allow proper mocking and unit testing
 	t.Skip("Skipping - requires refactoring for dependency injection")
@@ -64,11 +64,11 @@ func TestFetchAndStore_AllChannelsFail(t *testing.T) {
 func TestTodayJST(t *testing.T) {
 	// Test the todayJST function
 	result := todayJST()
-	
+
 	// Should return today's date in JST
 	now := time.Now()
 	expected := civil.DateOf(now)
-	
+
 	if result != expected {
 		t.Errorf("todayJST() = %v, want %v", result, expected)
 	}

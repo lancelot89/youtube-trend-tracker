@@ -10,9 +10,9 @@ import (
 
 func TestLogLevels(t *testing.T) {
 	tests := []struct {
-		name     string
-		envLevel string
-		logLevel LogLevel
+		name      string
+		envLevel  string
+		logLevel  LogLevel
 		shouldLog bool
 	}{
 		{"Info logs at info level", "info", INFO, true},
@@ -152,7 +152,7 @@ func TestLoggerWithLabels(t *testing.T) {
 
 	// Log with labels
 	labels := map[string]string{
-		"channel_id": "test123",
+		"channel_id":  "test123",
 		"video_count": "10",
 	}
 	l.Info("test with labels", labels)
