@@ -28,27 +28,15 @@ gcloud artifacts repositories describe "$AR_REPO" --location="$REGION" >/dev/nul
 docker build -t "$IMAGE_URI" .
 docker push "$IMAGE_URI"
 
-# Service Account（なければ作成）
-gcloud iam service-accounts describe "$SERVICE_ACCOUNT" >/dev/null 2>&1 || \
-  gcloud iam service-accounts create "trend-tracker-sa" \
-    --display-name="YouTube Trend Tracker SA"
-
-# ランタイム SA に必要な権限
-# - Artifact Registry Reader（プライベートイメージをPull）
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${SERVICE_ACCOUNT}" \
-  --role="roles/artifactregistry.reader" >/dev/null
-
-# - BigQuery 書き込み
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${SERVICE_ACCOUNT}" \
-  --role="roles/bigquery.dataEditor" >/dev/null
-
-# - Secret Manager 参照
-gcloud secrets add-iam-policy-binding youtube-api-key \
-  --member="serviceAccount:${SERVICE_ACCOUNT}" \
-  --role="roles/secretmanager.secretAccessor" \
-  --project="$PROJECT_ID" >/dev/null
+# Service Account Setup
+# Note: Service account creation and permission grants are now handled by
+# ./scripts/setup-service-accounts.sh for better maintainability.
+# Run that script first if the service account doesn't exist.
+if ! gcloud iam service-accounts describe "$SERVICE_ACCOUNT" >/dev/null 2>&1; then
+  echo "Error: Service account '$SERVICE_ACCOUNT' does not exist."
+  echo "Please run: ./scripts/setup-service-accounts.sh $PROJECT_ID $REGION $SERVICE"
+  exit 1
+fi
 
 # Deploy to Cloud Run
 gcloud run deploy "$SERVICE" \

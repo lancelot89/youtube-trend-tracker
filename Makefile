@@ -135,17 +135,19 @@ redeploy:
 ## setup: Initial project setup
 setup:
 	@echo "$(GREEN)Setting up project...$(NC)"
-	@echo "Step 1/6: Enabling APIs..."
+	@echo "Step 1/7: Enabling APIs..."
 	./scripts/enable-apis.sh $(PROJECT_ID)
-	@echo "Step 2/6: Setting up Artifact Registry..."
+	@echo "Step 2/7: Setting up service accounts..."
+	./scripts/setup-service-accounts.sh $(PROJECT_ID) $(REGION) $(SERVICE_NAME)
+	@echo "Step 3/7: Setting up Artifact Registry..."
 	./scripts/setup-artifact-registry.sh $(PROJECT_ID) $(REGION) $(AR_REPO)
-	@echo "Step 3/6: Creating secrets..."
+	@echo "Step 4/7: Creating secrets..."
 	./scripts/create-secret.sh
-	@echo "Step 4/6: Building and pushing image..."
+	@echo "Step 5/7: Building and pushing image..."
 	./scripts/build-and-push.sh $(PROJECT_ID) $(REGION) $(AR_REPO) $(SERVICE_NAME)
-	@echo "Step 5/6: Deploying Cloud Run service..."
+	@echo "Step 6/7: Deploying Cloud Run service..."
 	./scripts/deploy-cloud-run.sh $(PROJECT_ID) $(REGION) $(SERVICE_NAME) $(AR_REPO)
-	@echo "Step 6/6: Creating Cloud Scheduler job..."
+	@echo "Step 7/7: Creating Cloud Scheduler job..."
 	./scripts/create-scheduler.sh $(PROJECT_ID) $(REGION) $(SERVICE_NAME)
 	@echo "$(GREEN)Setup complete!$(NC)"
 
@@ -173,3 +175,9 @@ install-tools:
 	@echo "$(GREEN)Installing development tools...$(NC)"
 	go install github.com/air-verse/air@latest
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin
+
+## setup-iam: Setup service accounts and IAM permissions
+setup-iam:
+	@echo "$(GREEN)Setting up service accounts and IAM permissions...$(NC)"
+	./scripts/setup-service-accounts.sh $(PROJECT_ID) $(REGION) $(SERVICE_NAME)
+	@echo "$(GREEN)IAM setup complete!$(NC)"
