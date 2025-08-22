@@ -1,9 +1,14 @@
-# Project variables
+# Load environment variables from .env if it exists
+-include .env
+export
+
+# Project variables (can be overridden by .env or command line)
 PROJECT_ID ?= $(shell gcloud config get-value project)
 REGION ?= asia-northeast1
 AR_REPO ?= youtube-trend-repo
 SERVICE_NAME ?= youtube-trend-tracker
 IMAGE_TAG ?= latest
+BQ_DATASET ?= youtube
 
 # Go variables
 GOCMD = go
@@ -133,21 +138,23 @@ redeploy:
 	./scripts/redeploy.sh $(PROJECT_ID) $(REGION) $(AR_REPO) $(SERVICE_NAME)
 
 ## setup: Initial project setup
-setup:
+setup: env-check
 	@echo "$(GREEN)Setting up project...$(NC)"
-	@echo "Step 1/7: Enabling APIs..."
+	@echo "Step 1/8: Enabling APIs..."
 	./scripts/enable-apis.sh $(PROJECT_ID)
-	@echo "Step 2/7: Setting up service accounts..."
+	@echo "Step 2/8: Setting up service accounts..."
 	./scripts/setup-service-accounts.sh $(PROJECT_ID) $(REGION) $(SERVICE_NAME)
-	@echo "Step 3/7: Setting up Artifact Registry..."
+	@echo "Step 3/8: Setting up BigQuery..."
+	./scripts/setup-bigquery.sh $(PROJECT_ID) $(BQ_DATASET)
+	@echo "Step 4/8: Setting up Artifact Registry..."
 	./scripts/setup-artifact-registry.sh $(PROJECT_ID) $(REGION) $(AR_REPO)
-	@echo "Step 4/7: Creating secrets..."
+	@echo "Step 5/8: Creating secrets..."
 	./scripts/create-secret.sh
-	@echo "Step 5/7: Building and pushing image..."
+	@echo "Step 6/8: Building and pushing image..."
 	./scripts/build-and-push.sh $(PROJECT_ID) $(REGION) $(AR_REPO) $(SERVICE_NAME)
-	@echo "Step 6/7: Deploying Cloud Run service..."
+	@echo "Step 7/8: Deploying Cloud Run service..."
 	./scripts/deploy-cloud-run.sh $(PROJECT_ID) $(REGION) $(SERVICE_NAME) $(AR_REPO)
-	@echo "Step 7/7: Creating Cloud Scheduler job..."
+	@echo "Step 8/8: Creating Cloud Scheduler job..."
 	./scripts/create-scheduler.sh $(PROJECT_ID) $(REGION) $(SERVICE_NAME)
 	@echo "$(GREEN)Setup complete!$(NC)"
 
@@ -181,3 +188,41 @@ setup-iam:
 	@echo "$(GREEN)Setting up service accounts and IAM permissions...$(NC)"
 	./scripts/setup-service-accounts.sh $(PROJECT_ID) $(REGION) $(SERVICE_NAME)
 	@echo "$(GREEN)IAM setup complete!$(NC)"
+
+## setup-bigquery: Setup BigQuery dataset and tables
+setup-bigquery:
+	@echo "$(GREEN)Setting up BigQuery dataset and tables...$(NC)"
+	./scripts/setup-bigquery.sh $(PROJECT_ID) $(BQ_DATASET)
+	@echo "$(GREEN)BigQuery setup complete!$(NC)"
+
+## diag: Display diagnostic information
+diag:
+	@echo "$(GREEN)=== Diagnostic Information ===$(NC)"
+	@echo "Go version:" && go version || echo "Go not installed"
+	@echo "gcloud:" && gcloud --version | head -n1 || echo "gcloud not installed"
+	@echo "Docker:" && docker --version || echo "Docker not installed"
+	@echo "Project: $(PROJECT_ID)"
+	@echo "Region: $(REGION)"
+	@echo "Service: $(SERVICE_NAME)"
+	@echo "AR Repo: $(AR_REPO)"
+	@echo "BQ Dataset: $(BQ_DATASET)"
+
+## run-once: Run the fetcher once with debug mode
+run-once: mod-download
+	@echo "$(GREEN)Running fetcher once in debug mode...$(NC)"
+	go run $(MAIN_PATH)/main.go --once --debug
+
+## bq-test: Test BigQuery connection
+bq-test:
+	@echo "$(GREEN)Testing BigQuery connection...$(NC)"
+	bq query --use_legacy_sql=false --project_id=$(PROJECT_ID) "SELECT 1 as test"
+	@echo "$(GREEN)BigQuery connection successful!$(NC)"
+
+## env-check: Verify required environment variables
+env-check:
+	@echo "$(GREEN)Checking environment variables...$(NC)"
+	@test -n "$(PROJECT_ID)" || (echo "$(RED)ERROR: PROJECT_ID not set$(NC)" && false)
+	@test -n "$(REGION)" || (echo "$(RED)ERROR: REGION not set$(NC)" && false)
+	@test -n "$(AR_REPO)" || (echo "$(RED)ERROR: AR_REPO not set$(NC)" && false)
+	@test -n "$(SERVICE_NAME)" || (echo "$(RED)ERROR: SERVICE_NAME not set$(NC)" && false)
+	@echo "$(GREEN)All required environment variables are set!$(NC)"
