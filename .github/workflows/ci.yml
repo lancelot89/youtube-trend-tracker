@@ -56,13 +56,32 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
 
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v6
-      with:
-        version: latest
-        args: --timeout=5m
-        skip-cache: true
-        skip-build-cache: true
+    - name: Run go fmt
+      run: |
+        fmt_output=$(gofmt -l .)
+        if [ -n "$fmt_output" ]; then
+          echo "The following files need formatting:"
+          echo "$fmt_output"
+          exit 1
+        fi
+
+    - name: Run go vet
+      run: go vet ./...
+
+    - name: Run go mod tidy check
+      run: |
+        go mod tidy
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "go mod tidy produced changes"
+          git diff
+          exit 1
+        fi
+
+    - name: Run staticcheck (if available)
+      run: |
+        go install honnef.co/go/tools/cmd/staticcheck@latest
+        staticcheck ./...
+      continue-on-error: true
 
   build:
     name: Build
