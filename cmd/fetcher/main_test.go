@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
+
+	"github.com/lancelop89/youtube-trend-tracker/internal/config"
 )
 
 func TestHealthzHandler(t *testing.T) {
@@ -61,194 +62,18 @@ func TestInfoHandler(t *testing.T) {
 	}
 }
 
-func TestIsLocal(t *testing.T) {
-	// Save original value
-	original := os.Getenv("GO_ENV")
-	defer os.Setenv("GO_ENV", original)
-
-	// Test local environment
-	os.Setenv("GO_ENV", "local")
-	if !isLocal() {
-		t.Error("isLocal() should return true when GO_ENV=local")
-	}
-
-	// Test non-local environment
-	os.Setenv("GO_ENV", "production")
-	if isLocal() {
-		t.Error("isLocal() should return false when GO_ENV!=local")
-	}
-
-	// Test unset environment
-	os.Unsetenv("GO_ENV")
-	if isLocal() {
-		t.Error("isLocal() should return false when GO_ENV is unset")
-	}
-}
-
-func TestIsValidAPIKey(t *testing.T) {
-	tests := []struct {
-		name     string
-		apiKey   string
-		expected bool
-	}{
-		{
-			name:     "Valid API key",
-			apiKey:   "AIzaSyA1234567890abcdefghijklmnopqrstuv",
-			expected: true,
-		},
-		{
-			name:     "Too short",
-			apiKey:   "AIzaSyA123",
-			expected: false,
-		},
-		{
-			name:     "Too long",
-			apiKey:   "AIzaSyA1234567890abcdefghijklmnopqrstuvwxyz1234567890",
-			expected: false,
-		},
-		{
-			name:     "Contains space",
-			apiKey:   "AIzaSyA1234567890 abcdefghijklmnopqrstuv",
-			expected: false,
-		},
-		{
-			name:     "Contains newline",
-			apiKey:   "AIzaSyA1234567890\nabcdefghijklmnopqrstuv",
-			expected: false,
-		},
-		{
-			name:     "Contains tab",
-			apiKey:   "AIzaSyA1234567890\tabcdefghijklmnopqrstuv",
-			expected: false,
-		},
-		{
-			name:     "With dashes",
-			apiKey:   "AIzaSyA-1234567890-abcdefghijklmnopqrstuv",
-			expected: true,
-		},
-		{
-			name:     "With underscores",
-			apiKey:   "AIzaSyA_1234567890_abcdefghijklmnopqrstuv",
-			expected: true,
-		},
-		{
-			name:     "Invalid characters",
-			apiKey:   "AIzaSyA@1234567890#abcdefghijklmnopqrstuv",
-			expected: false,
-		},
-		{
-			name:     "Empty string",
-			apiKey:   "",
-			expected: false,
-		},
-		{
-			name:     "With leading/trailing spaces",
-			apiKey:   "  AIzaSyA1234567890abcdefghijklmnopqrstuv  ",
-			expected: true, // Should be trimmed
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isValidAPIKey(tt.apiKey)
-			if result != tt.expected {
-				t.Errorf("isValidAPIKey(%q) = %v, want %v", tt.apiKey, result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestGetProjectID(t *testing.T) {
-	// Save original values
-	origProjectID := os.Getenv("PROJECT_ID")
-	origGoogleCloudProject := os.Getenv("GOOGLE_CLOUD_PROJECT")
+func TestHandler_NoChannels(t *testing.T) {
+	// Save original config
+	originalCfg := cfg
 	defer func() {
-		os.Setenv("PROJECT_ID", origProjectID)
-		os.Setenv("GOOGLE_CLOUD_PROJECT", origGoogleCloudProject)
+		cfg = originalCfg
 	}()
 
-	tests := []struct {
-		name               string
-		projectID          string
-		googleCloudProject string
-		expectedID         string
-		expectError        bool
-	}{
-		{
-			name:        "PROJECT_ID set",
-			projectID:   "test-project-1",
-			expectedID:  "test-project-1",
-			expectError: false,
-		},
-		{
-			name:               "GOOGLE_CLOUD_PROJECT set",
-			googleCloudProject: "test-project-2",
-			expectedID:         "test-project-2",
-			expectError:        false,
-		},
-		{
-			name:               "Both set, PROJECT_ID takes precedence",
-			projectID:          "test-project-1",
-			googleCloudProject: "test-project-2",
-			expectedID:         "test-project-1",
-			expectError:        false,
-		},
-		{
-			name:        "Neither set",
-			expectedID:  "",
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Clear environment
-			os.Unsetenv("PROJECT_ID")
-			os.Unsetenv("GOOGLE_CLOUD_PROJECT")
-
-			// Set test values
-			if tt.projectID != "" {
-				os.Setenv("PROJECT_ID", tt.projectID)
-			}
-			if tt.googleCloudProject != "" {
-				os.Setenv("GOOGLE_CLOUD_PROJECT", tt.googleCloudProject)
-			}
-
-			// Test
-			id, err := getProjectID()
-			if tt.expectError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if id != tt.expectedID {
-					t.Errorf("getProjectID() = %v, want %v", id, tt.expectedID)
-				}
-			}
-		})
-	}
-}
-
-func TestHandler_MissingEnvVars(t *testing.T) {
-	// Save original values
-	origValues := map[string]string{
-		"GOOGLE_CLOUD_PROJECT": os.Getenv("GOOGLE_CLOUD_PROJECT"),
-		"YOUTUBE_API_KEY":      os.Getenv("YOUTUBE_API_KEY"),
-		"CHANNEL_CONFIG_PATH":  os.Getenv("CHANNEL_CONFIG_PATH"),
-	}
-	defer func() {
-		for k, v := range origValues {
-			os.Setenv(k, v)
-		}
-	}()
-
-	// Clear required environment variables
-	os.Unsetenv("GOOGLE_CLOUD_PROJECT")
-	os.Unsetenv("YOUTUBE_API_KEY")
-	os.Unsetenv("CHANNEL_CONFIG_PATH")
+	// Create config with no enabled channels
+	cfg = config.DefaultConfig()
+	cfg.YouTube.APIKey = "test-api-key"
+	cfg.GCP.ProjectID = "test-project"
+	cfg.Channels = []config.ChannelConfig{}
 
 	req, err := http.NewRequest("POST", "/", nil)
 	if err != nil {
@@ -264,7 +89,7 @@ func TestHandler_MissingEnvVars(t *testing.T) {
 			status, http.StatusInternalServerError)
 	}
 
-	expectedBody := "Server configuration error"
+	expectedBody := "No channels configured"
 	if body := rr.Body.String(); body != expectedBody+"\n" {
 		t.Errorf("handler returned unexpected body: got %v want %v",
 			body, expectedBody)

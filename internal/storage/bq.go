@@ -13,14 +13,11 @@ import (
 	"google.golang.org/api/option"
 )
 
-const (
-	DatasetID = "youtube"
-	TableID   = "video_trends"
-)
-
 // BigQueryWriter provides methods to write data to BigQuery.
 type BigQueryWriter struct {
-	client *bigquery.Client
+	client    *bigquery.Client
+	datasetID string
+	tableID   string
 }
 
 // VideoStatsRecord represents a record to be inserted into BigQuery.
@@ -44,11 +41,11 @@ type VideoStatsRecord struct {
 
 // EnsureTableExists checks if the dataset and table exist, and creates them if they don't.
 func (w *BigQueryWriter) EnsureTableExists(ctx context.Context) error {
-	_, err := w.client.Dataset(DatasetID).Metadata(ctx)
+	_, err := w.client.Dataset(w.datasetID).Metadata(ctx)
 	if err != nil {
 		if e, ok := err.(*googleapi.Error); ok && e.Code == http.StatusNotFound {
 			// Dataset doesn't exist, create it.
-			if err := w.client.Dataset(DatasetID).Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
+			if err := w.client.Dataset(w.datasetID).Create(ctx, &bigquery.DatasetMetadata{}); err != nil {
 				return fmt.Errorf("failed to create dataset: %w", err)
 			}
 		} else {
@@ -56,7 +53,7 @@ func (w *BigQueryWriter) EnsureTableExists(ctx context.Context) error {
 		}
 	}
 
-	table := w.client.Dataset(DatasetID).Table(TableID)
+	table := w.client.Dataset(w.datasetID).Table(w.tableID)
 	if _, err := table.Metadata(ctx); err != nil {
 		if e, ok := err.(*googleapi.Error); ok && e.Code == http.StatusNotFound {
 			// Table doesn't exist, create it.
@@ -109,6 +106,11 @@ func getSchemaJSON() []byte {
 
 // NewBigQueryWriter creates a new BigQuery writer.
 func NewBigQueryWriter(ctx context.Context, projectID string) (*BigQueryWriter, error) {
+	return NewBigQueryWriterWithConfig(ctx, projectID, "youtube", "video_trends")
+}
+
+// NewBigQueryWriterWithConfig creates a new BigQuery writer with custom dataset and table IDs.
+func NewBigQueryWriterWithConfig(ctx context.Context, projectID, datasetID, tableID string) (*BigQueryWriter, error) {
 	var opts []option.ClientOption
 	if host := os.Getenv("BIGQUERY_EMULATOR_HOST"); host != "" {
 		// For connecting to the emulator's HTTP endpoint
@@ -121,7 +123,11 @@ func NewBigQueryWriter(ctx context.Context, projectID string) (*BigQueryWriter, 
 	if err != nil {
 		return nil, fmt.Errorf("bigquery.NewClient: %w", err)
 	}
-	return &BigQueryWriter{client: client}, nil
+	return &BigQueryWriter{
+		client:    client,
+		datasetID: datasetID,
+		tableID:   tableID,
+	}, nil
 }
 
 // InsertVideoStats inserts video statistics into the BigQuery table.
@@ -130,7 +136,7 @@ func (w *BigQueryWriter) InsertVideoStats(ctx context.Context, records []*VideoS
 		return nil // No records to insert
 	}
 
-	inserter := w.client.Dataset(DatasetID).Table(TableID).Inserter()
+	inserter := w.client.Dataset(w.datasetID).Table(w.tableID).Inserter()
 	if err := inserter.Put(ctx, records); err != nil {
 		return fmt.Errorf("failed to insert records into BigQuery: %w", err)
 	}

@@ -49,6 +49,4 @@ fi
 # --- Run Application ---
 echo "Starting Go application..."
 cd "$PROJECT_ROOT/cmd/fetcher"
-export CHANNEL_CONFIG=$(cat "$PROJECT_ROOT/configs/channels.yaml")
-
-go run ./main.go
+go run ./main.go --config "$PROJECT_ROOT/configs/config.yaml"
