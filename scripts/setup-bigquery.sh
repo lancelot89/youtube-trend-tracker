@@ -58,96 +58,68 @@ else
 fi
 
 # ==============================================================================
-# 2. Create videos table
+# 2. Create video_trends table
 # ==============================================================================
 echo ""
-echo -e "${YELLOW}[2/4] Creating videos table...${NC}"
+echo -e "${YELLOW}[2/3] Creating video_trends table...${NC}"
 
 # Check if table exists
-if bq ls --project_id="$PROJECT_ID" "$DATASET_NAME" | grep -q "videos"; then
-    echo "  ✓ Table 'videos' already exists"
+if bq ls --project_id="$PROJECT_ID" "$DATASET_NAME" | grep -q "video_trends"; then
+    echo "  ✓ Table 'video_trends' already exists"
     echo "  Note: To update the schema, use 'bq update' or migration scripts"
 else
-    echo "  Creating table 'videos'..."
+    echo "  Creating table 'video_trends'..."
     
-    # Create table with schema
+    # Create table with schema matching internal/storage/bq.go
     bq mk \
         --project_id="$PROJECT_ID" \
         --table \
-        --time_partitioning_field=captured_at \
+        --time_partitioning_field=dt \
         --time_partitioning_type=DAY \
         --clustering_fields=channel_id,video_id \
         --description="YouTube video trend data" \
-        "$DATASET_NAME.videos" \
-        video_id:STRING,channel_id:STRING,title:STRING,description:STRING,channel_title:STRING,published_at:TIMESTAMP,captured_at:TIMESTAMP,category_id:STRING,tags:STRING,view_count:INT64,like_count:INT64,comment_count:INT64,favorite_count:INT64,duration:STRING,definition:STRING,caption:STRING,licensed_content:BOOL,region_code:STRING,is_short:BOOL
+        "$DATASET_NAME.video_trends" \
+        dt:DATE,channel_id:STRING,video_id:STRING,title:STRING,channel_name:STRING,tags:STRING,is_short:BOOL,views:INTEGER,likes:INTEGER,comments:INTEGER,published_at:TIMESTAMP,created_at:TIMESTAMP,duration_sec:INTEGER,content_details:STRING,topic_details:STRING
     
-    echo "  ✓ Table 'videos' created"
+    echo "  ✓ Table 'video_trends' created"
 fi
 
 # ==============================================================================
-# 3. Create channels table
+# 3. Create views
 # ==============================================================================
 echo ""
-echo -e "${YELLOW}[3/4] Creating channels table...${NC}"
+echo -e "${YELLOW}[3/3] Creating analytical views...${NC}"
 
-# Check if table exists
-if bq ls --project_id="$PROJECT_ID" "$DATASET_NAME" | grep -q "channels"; then
-    echo "  ✓ Table 'channels' already exists"
-    echo "  Note: To update the schema, use 'bq update' or migration scripts"
-else
-    echo "  Creating table 'channels'..."
-    
-    # Create table with schema
-    bq mk \
-        --project_id="$PROJECT_ID" \
-        --table \
-        --time_partitioning_field=captured_at \
-        --time_partitioning_type=DAY \
-        --clustering_fields=channel_id \
-        --description="YouTube channel information" \
-        "$DATASET_NAME.channels" \
-        channel_id:STRING,title:STRING,description:STRING,custom_url:STRING,country:STRING,published_at:TIMESTAMP,captured_at:TIMESTAMP,view_count:INT64,subscriber_count:INT64,video_count:INT64,uploads_playlist_id:STRING,thumbnail_url:STRING,topic_categories:STRING,keywords:STRING
-    
-    echo "  ✓ Table 'channels' created"
-fi
-
-# ==============================================================================
-# 4. Create views
-# ==============================================================================
-echo ""
-echo -e "${YELLOW}[4/4] Creating analytical views...${NC}"
-
-# Create video_trends view
-echo "  Creating view 'video_trends'..."
+# Create video_trends_analysis view
+echo "  Creating view 'video_trends_analysis'..."
 bq query \
     --project_id="$PROJECT_ID" \
     --use_legacy_sql=false \
     --replace \
-    "CREATE OR REPLACE VIEW \`${PROJECT_ID}.${DATASET_NAME}.video_trends\` AS
+    "CREATE OR REPLACE VIEW \`${PROJECT_ID}.${DATASET_NAME}.video_trends_analysis\` AS
     SELECT
       video_id,
       channel_id,
       title,
       published_at,
-      captured_at,
-      view_count,
-      like_count,
-      comment_count,
-      LAG(view_count) OVER (PARTITION BY video_id ORDER BY captured_at) AS prev_view_count,
-      LAG(like_count) OVER (PARTITION BY video_id ORDER BY captured_at) AS prev_like_count,
+      created_at,
+      views,
+      likes,
+      comments,
+      LAG(views) OVER (PARTITION BY video_id ORDER BY created_at) AS prev_views,
+      LAG(likes) OVER (PARTITION BY video_id ORDER BY created_at) AS prev_likes,
       SAFE_DIVIDE(
-        view_count - LAG(view_count) OVER (PARTITION BY video_id ORDER BY captured_at),
-        LAG(view_count) OVER (PARTITION BY video_id ORDER BY captured_at)
+        views - LAG(views) OVER (PARTITION BY video_id ORDER BY created_at),
+        LAG(views) OVER (PARTITION BY video_id ORDER BY created_at)
       ) * 100 AS view_growth_rate,
       SAFE_DIVIDE(
-        view_count - LAG(view_count) OVER (PARTITION BY video_id ORDER BY captured_at),
-        TIMESTAMP_DIFF(captured_at, LAG(captured_at) OVER (PARTITION BY video_id ORDER BY captured_at), HOUR)
-      ) AS views_per_hour,
-      region_code
+        views - LAG(views) OVER (PARTITION BY video_id ORDER BY created_at),
+        TIMESTAMP_DIFF(created_at, LAG(created_at) OVER (PARTITION BY video_id ORDER BY created_at), HOUR)
+      ) AS views_per_hour
     FROM
-      \`${PROJECT_ID}.${DATASET_NAME}.videos\`
+      \`${PROJECT_ID}.${DATASET_NAME}.video_trends\`
     WHERE
-      captured_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)" 2>/dev/null || echo "  ⚠ View creation skipped (may already exist or no data)"
+      created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)" 2>/dev/null || echo "  ⚠ View creation skipped (may already exist or no data)"
 
 echo "  ✓ Views setup complete"
 
@@ -160,10 +132,9 @@ echo ""
 echo "Dataset and Tables Created:"
 echo "  • Dataset: ${DATASET_NAME}"
 echo "  • Tables:"
-echo "    - ${DATASET_NAME}.videos (partitioned by captured_at, clustered by channel_id, video_id)"
-echo "    - ${DATASET_NAME}.channels (partitioned by captured_at, clustered by channel_id)"
+echo "    - ${DATASET_NAME}.video_trends (partitioned by dt, clustered by channel_id, video_id)"
 echo "  • Views:"
-echo "    - ${DATASET_NAME}.video_trends (trend analysis)"
+echo "    - ${DATASET_NAME}.video_trends_analysis (trend analysis)"
 echo ""
 echo "Next Steps:"
 echo "  1. Deploy the Cloud Run service to start collecting data:"
@@ -171,4 +142,4 @@ echo "     ./scripts/deploy-cloud-run.sh $PROJECT_ID <region> <service_name> <ar
 echo "  2. Verify tables in BigQuery Console:"
 echo "     https://console.cloud.google.com/bigquery?project=$PROJECT_ID"
 echo "  3. Query sample data (once available):"
-echo "     bq query --use_legacy_sql=false \"SELECT * FROM \\\`${PROJECT_ID}.${DATASET_NAME}.videos\\\` LIMIT 10\""
+echo "     bq query --use_legacy_sql=false \"SELECT * FROM \\\`${PROJECT_ID}.${DATASET_NAME}.video_trends\\\` LIMIT 10\""

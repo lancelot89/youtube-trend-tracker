@@ -18,94 +18,50 @@ OPTIONS(
 );
 
 -- ----------------------------------------------------------------------------
--- videos テーブル: 動画のトレンドデータ
+-- video_trends テーブル: 動画のトレンドデータ
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.youtube.videos` (
-  -- 識別子
-  video_id STRING NOT NULL OPTIONS(description="YouTube動画ID"),
+-- 実際のコード(internal/storage/bq.go)で定義されているスキーマ
+CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.youtube.video_trends` (
+  -- 日付と識別子
+  dt DATE NOT NULL OPTIONS(description="スナップショット日付"),
   channel_id STRING NOT NULL OPTIONS(description="YouTubeチャンネルID"),
+  video_id STRING NOT NULL OPTIONS(description="YouTube動画ID"),
   
   -- 基本情報
   title STRING OPTIONS(description="動画タイトル"),
-  description STRING OPTIONS(description="動画の説明文"),
-  channel_title STRING OPTIONS(description="チャンネル名"),
+  channel_name STRING OPTIONS(description="チャンネル名"),
+  tags ARRAY<STRING> OPTIONS(description="動画タグのリスト"),
+  is_short BOOL OPTIONS(description="ショート動画フラグ"),
+  
+  -- 統計情報
+  views INT64 OPTIONS(description="再生回数"),
+  likes INT64 OPTIONS(description="高評価数"),
+  comments INT64 OPTIONS(description="コメント数"),
   
   -- 時刻情報
   published_at TIMESTAMP OPTIONS(description="動画の公開日時"),
-  captured_at TIMESTAMP NOT NULL OPTIONS(description="データ取得日時"),
+  created_at TIMESTAMP NOT NULL OPTIONS(description="データ取得日時"),
   
-  -- カテゴリとタグ
-  category_id STRING OPTIONS(description="YouTubeカテゴリID"),
-  tags ARRAY<STRING> OPTIONS(description="動画タグのリスト"),
-  
-  -- 統計情報
-  view_count INT64 OPTIONS(description="再生回数"),
-  like_count INT64 OPTIONS(description="高評価数"),
-  comment_count INT64 OPTIONS(description="コメント数"),
-  favorite_count INT64 OPTIONS(description="お気に入り数"),
-  
-  -- 動画メタデータ
-  duration STRING OPTIONS(description="動画の長さ (ISO 8601形式)"),
-  definition STRING OPTIONS(description="動画の画質 (hd/sd)"),
-  caption STRING OPTIONS(description="字幕の有無"),
-  licensed_content BOOL OPTIONS(description="ライセンスコンテンツフラグ"),
-  
-  -- 地域情報
-  region_code STRING OPTIONS(description="取得地域コード (JP)"),
-  
-  -- ショート動画判定
-  is_short BOOL OPTIONS(description="ショート動画フラグ")
+  -- 追加メタデータ
+  duration_sec INT64 OPTIONS(description="動画の長さ（秒）"),
+  content_details STRING OPTIONS(description="コンテンツ詳細"),
+  topic_details ARRAY<STRING> OPTIONS(description="トピック詳細")
 )
-PARTITION BY DATE(captured_at)
+PARTITION BY dt  -- dtフィールドでパーティショニング
 CLUSTER BY channel_id, video_id
 OPTIONS(
-  description="YouTube動画のトレンドデータを格納するテーブル",
-  partition_expiration_days=365  -- 1年後に自動削除
+  description="YouTube動画のトレンドデータを格納するテーブル"
 );
 
 -- ----------------------------------------------------------------------------
--- channels テーブル: チャンネル情報
+-- 注意: 現在の実装ではvideo_trendsテーブルのみ使用
+-- channelsテーブルは将来の拡張用（未実装）
 -- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `${PROJECT_ID}.youtube.channels` (
-  -- 識別子
-  channel_id STRING NOT NULL OPTIONS(description="YouTubeチャンネルID"),
-  
-  -- 基本情報
-  title STRING OPTIONS(description="チャンネル名"),
-  description STRING OPTIONS(description="チャンネルの説明"),
-  custom_url STRING OPTIONS(description="カスタムURL"),
-  country STRING OPTIONS(description="チャンネルの国"),
-  
-  -- 時刻情報
-  published_at TIMESTAMP OPTIONS(description="チャンネル作成日時"),
-  captured_at TIMESTAMP NOT NULL OPTIONS(description="データ取得日時"),
-  
-  -- 統計情報
-  view_count INT64 OPTIONS(description="総再生回数"),
-  subscriber_count INT64 OPTIONS(description="チャンネル登録者数"),
-  video_count INT64 OPTIONS(description="公開動画数"),
-  
-  -- プレイリスト
-  uploads_playlist_id STRING OPTIONS(description="アップロード動画のプレイリストID"),
-  
-  -- サムネイル
-  thumbnail_url STRING OPTIONS(description="チャンネルサムネイルURL"),
-  
-  -- その他のメタデータ
-  topic_categories ARRAY<STRING> OPTIONS(description="トピックカテゴリ"),
-  keywords ARRAY<STRING> OPTIONS(description="チャンネルキーワード")
-)
-PARTITION BY DATE(captured_at)
-CLUSTER BY channel_id
-OPTIONS(
-  description="YouTubeチャンネルの情報を格納するテーブル",
-  partition_expiration_days=365  -- 1年後に自動削除
-);
 
 -- ----------------------------------------------------------------------------
--- video_trends ビュー: 動画のトレンド分析用
+-- video_trends_analysis ビュー: 動画のトレンド分析用
 -- ----------------------------------------------------------------------------
-CREATE OR REPLACE VIEW `${PROJECT_ID}.youtube.video_trends` AS
+CREATE OR REPLACE VIEW `${PROJECT_ID}.youtube.video_trends_analysis` AS
 SELECT
   video_id,
   channel_id,
@@ -130,9 +86,9 @@ SELECT
   ) AS views_per_hour,
   region_code
 FROM
-  `${PROJECT_ID}.youtube.videos`
+  `${PROJECT_ID}.youtube.video_trends`
 WHERE
-  captured_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY);
+  created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY);
 
 -- ----------------------------------------------------------------------------
 -- daily_summary ビュー: 日次サマリー
@@ -154,7 +110,7 @@ SELECT
     LIMIT 10
   ) AS top_10_videos
 FROM
-  `${PROJECT_ID}.youtube.videos`
+  `${PROJECT_ID}.youtube.video_trends`
 GROUP BY
   date, region_code;
 
