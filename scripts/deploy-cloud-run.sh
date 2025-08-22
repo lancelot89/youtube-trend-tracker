@@ -2,14 +2,14 @@
 set -euo pipefail
 
 if [ $# -lt 4 ]; then
-  echo "Usage: $0 <project_id> <region> <service_name> <repo_name>"
+  echo "Usage: $0 <project_id> <region> <repo_name> <service_name>"
   exit 1
 fi
 
 PROJECT_ID="$1"
 REGION="$2"             # 例: asia-northeast1
-SERVICE="$3"            # 例: fetcher
-AR_REPO="$4"            # 例: trend-tracker-repo
+AR_REPO="$3"            # 例: youtube-trend-repo
+SERVICE="$4"            # 例: youtube-trend-tracker
 
 TAG="$(date +%Y%m%d-%H%M)"
 IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE}:${TAG}"
