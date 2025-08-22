@@ -20,18 +20,23 @@ if [ -z "$CRON_SVC_URL" ]; then
     exit 1
 fi
 
-# Create service account for scheduler (if it doesn't exist)
-gcloud iam service-accounts describe "$SCHEDULER_SA" --project="$PROJECT_ID" >/dev/null 2>&1 || \
-    gcloud iam service-accounts create scheduler-sa \
-        --display-name="Cloud Scheduler Invoker SA" \
-        --project="$PROJECT_ID"
+# Service Account Setup
+# Note: Service account creation and permission grants are now handled by
+# ./scripts/setup-service-accounts.sh for better maintainability.
+if ! gcloud iam service-accounts describe "$SCHEDULER_SA" --project="$PROJECT_ID" >/dev/null 2>&1; then
+    echo "Error: Service account '$SCHEDULER_SA' does not exist."
+    echo "Please run: ./scripts/setup-service-accounts.sh $PROJECT_ID $REGION $SERVICE"
+    exit 1
+fi
 
-# Grant invoker role to the scheduler service account for the specific Cloud Run service
-gcloud run services add-iam-policy-binding "$SERVICE" \
-    --region="$REGION" \
-    --member="serviceAccount:$SCHEDULER_SA" \
-    --role="roles/run.invoker" \
-    --project="$PROJECT_ID" >/dev/null
+# Verify that scheduler-sa has invoker permission (should be set by setup-service-accounts.sh)
+if ! gcloud run services get-iam-policy "$SERVICE" --region="$REGION" --project="$PROJECT_ID" \
+    --flatten="bindings[].members" \
+    --filter="bindings.members:serviceAccount:$SCHEDULER_SA" \
+    --format="value(bindings.members)" 2>/dev/null | grep -q "$SCHEDULER_SA"; then
+    echo "Warning: $SCHEDULER_SA may not have run.invoker permission."
+    echo "Please run: ./scripts/setup-service-accounts.sh $PROJECT_ID $REGION $SERVICE"
+fi
 
 # Check if the job already exists
 if gcloud scheduler jobs describe trend-tracker-hourly --location="$REGION" --project="$PROJECT_ID" >/dev/null 2>&1; then

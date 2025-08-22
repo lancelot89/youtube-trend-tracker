@@ -81,22 +81,25 @@ export SERVICE_NAME="youtube-trend-tracker" # Cloud Run のサービス名
 export YOUTUBE_API_KEY="your-youtube-api-key" # ご自身の API キーを設定してください
 
 # 2. デプロイスクリプトの実行
-echo "Step 1/6: Google Cloud API の有効化..."
+echo "Step 1/7: Google Cloud API の有効化..."
 ./scripts/enable-apis.sh "${PROJECT_ID}"
 
-echo -e "\nStep 2/6: Artifact Registry リポジトリのセットアップ..."
+echo -e "\nStep 2/7: サービスアカウントのセットアップ..."
+./scripts/setup-service-accounts.sh "${PROJECT_ID}" "${REGION}" "${SERVICE_NAME}"
+
+echo -e "\nStep 3/7: Artifact Registry リポジトリのセットアップ..."
 ./scripts/setup-artifact-registry.sh "${PROJECT_ID}" "${REGION}" "${AR_REPO}"
 
-echo -e "\nStep 3/6: YouTube APIキーを Secret Manager に登録..."
+echo -e "\nStep 4/7: YouTube APIキーを Secret Manager に登録..."
 ./scripts/create-secret.sh
 
-echo -e "\nStep 4/6: コンテナイメージのビルドとプッシュ..."
+echo -e "\nStep 5/7: コンテナイメージのビルドとプッシュ..."
 ./scripts/build-and-push.sh "${PROJECT_ID}" "${REGION}" "${AR_REPO}" "${SERVICE_NAME}"
 
-echo -e "\nStep 5/6: Cloud Run サービスのデプロイ..."
+echo -e "\nStep 6/7: Cloud Run サービスのデプロイ..."
 ./scripts/deploy-cloud-run.sh "${PROJECT_ID}" "${REGION}" "${SERVICE_NAME}" "${AR_REPO}"
 
-echo -e "\nStep 6/6: Cloud Scheduler ジョブの作成・更新..."
+echo -e "\nStep 7/7: Cloud Scheduler ジョブの作成・更新..."
 ./scripts/create-scheduler.sh "${PROJECT_ID}" "${REGION}" "${SERVICE_NAME}"
 
 echo -e "\n\n✅ 全てのデプロイプロセスが完了しました。"
@@ -131,32 +134,21 @@ gcloud services enable \
 
 ### 2. IAM & サービス アカウント
 
-| SA                 | 用途                                | 付与ロール                                            |
-| ------------------ | --------------------------------- | ------------------------------------------------ |
-| `trend-tracker-sa` | Cloud Run 実行 & BigQuery 書込        | `roles/run.invoker`, `roles/bigquery.dataEditor` |
-| `scheduler-sa`     | Cloud Scheduler → Cloud Run 呼び出し用 | `roles/run.invoker`                              |
+サービスアカウントの作成と権限設定は専用スクリプトで一元管理されています：
 
 ```bash
-# 例) SA 作成と役割付与
-gcloud iam service-accounts create trend-tracker-sa \
-  --display-name "YouTube Trend Tracker"
-
-# プロジェクトレベルのロールを付与
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:trend-tracker-sa@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role="roles/run.invoker"
-
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:trend-tracker-sa@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role="roles/bigquery.dataEditor"
-
-# Secret へのアクセス権を付与
-gcloud secrets add-iam-policy-binding youtube-api-key \
-    --member="serviceAccount:trend-tracker-sa@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/secretmanager.secretAccessor"
-
-
+# 全サービスアカウントのセットアップ
+./scripts/setup-service-accounts.sh "$PROJECT_ID" "$REGION" "$SERVICE_NAME"
 ```
+
+#### サービスアカウント一覧
+
+| SA                 | 用途                                | 必要な権限                                            |
+| ------------------ | --------------------------------- | ------------------------------------------------ |
+| `trend-tracker-sa` | Cloud Run 実行用 | `artifactregistry.reader`, `bigquery.dataEditor`, `bigquery.jobUser`, `secretmanager.secretAccessor` |
+| `scheduler-sa`     | Cloud Scheduler → Cloud Run 呼び出し用 | `run.invoker` (特定サービスのみ)                              |
+
+詳細な権限マトリクスは [`docs/IAM_PERMISSIONS.md`](docs/IAM_PERMISSIONS.md) を参照してください。
 
 ### 3. Secret Manager に API キーを登録
 
