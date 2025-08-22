@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go v0.121.0
 	cloud.google.com/go/bigquery v1.69.0
 	github.com/joho/godotenv v1.5.1
+	github.com/prometheus/client_golang v1.23.0
 	google.golang.org/api v0.246.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -31,7 +32,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pierrec/lz4/v4 v4.1.18 // indirect
-	github.com/prometheus/client_golang v1.23.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.65.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
