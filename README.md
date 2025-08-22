@@ -11,13 +11,8 @@
 │ Cloud Scheduler│ ─→    │  Cloud Run   │
 │  (cron 1h)     │  HTTP │  (API Fetch) │
 └───────────────┘        └──────┬───────┘
-                                 │ Pub/Sub (raw)
-                                 ▼
-                          ┌──────────────┐
-                          │ Cloud Tasks  │ (retry / rate‑limit)
-                          └──────────────┘
-                                 │
-                                 ▼
+                                │
+                                ▼
                           ┌──────────────┐
                           │  BigQuery    │  (videos, channels tables)
                           └──────────────┘
@@ -38,6 +33,34 @@
 * **Billing が有効化**された GCP プロジェクトを用意してください。
 * YouTube Data API v3 の API キーを発行済みであること。
 
+### 追加前提（WSL でデプロイする場合）
+
+| 項目                       | 必須条件                                                     |
+| ------------------------ | -------------------------------------------------------- |
+| Windows                  | Windows 10/11（WSL2 有効）                                   |
+| WSL                      | Version 2（`wsl -l -v` で確認）                               |
+| Docker Desktop           | インストール済み & **Resources → WSL Integration** で対象ディストロにチェック |
+| Docker CLI（WSL 内）        | `which docker` が **ELF (Linux)** を指すこと                   |
+| Google Cloud CLI（WSL 内）  | `which gcloud` が WSL 内のパスであること                           |
+| docker-credential-gcloud | `which docker-credential-gcloud` が見つかること                 |
+| ネットワーク                   | `*.googleapis.com`, `*.pkg.dev` へアウトバウンド可能               |
+
+> 備考
+>
+> * **Windows 版 `docker.exe` を呼ばない**よう注意（WSL 内では ELF の `docker` を使用）。
+> * **`DOCKER_HOST` / `DOCKER_CONTEXT` を固定しない**（誤設定は接続失敗や panic の原因）。
+
+### 追加前提（macOS でデプロイする場合）
+
+* macOS 12+ 推奨
+* **Docker Desktop for Mac** をインストール済み（起動中）
+* Homebrew が入っている（`brew -v`）
+
+### 追加前提（Windows／WSLを使わない場合）
+
+* **Docker Desktop for Windows** をインストール済み（起動中）
+* **Google Cloud SDK for Windows** をインストール済み
+* PowerShell を利用（推奨）
 ---
 
 ## クイックスタート (TL;DR)
