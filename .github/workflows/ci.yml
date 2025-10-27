@@ -99,7 +99,7 @@ jobs:
       run: go build -v -o fetcher ./cmd/fetcher
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: fetcher-binary
         path: fetcher
